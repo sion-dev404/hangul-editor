@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>한글 편집기</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%232b579a'/%3E%3Ctext x='16' y='23' font-size='20' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='bold'%3E한%3C/text%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Nanum+Gothic:wght@400;700&family=Nanum+Myeongjo:wght@400;700&family=Noto+Sans+KR:wght@400;700&family=Noto+Serif+KR:wght@400;700&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <header class="titlebar">
+    <span class="logo">한</span>
+    <input id="docName" value="새 문서" aria-label="문서 이름" />
+    <span id="saveState">자동 저장됨</span>
+  </header>
+
+  <nav class="tabs" id="tabs">
+    <button data-tab="file">파일</button>
+    <button data-tab="home" class="on">홈</button>
+    <button data-tab="insert">입력</button>
+    <button data-tab="page">쪽</button>
+    <button data-tab="view">보기</button>
+  </nav>
+
+  <section class="ribbon" id="ribbon">
+    <!-- 파일 -->
+    <div class="panel" data-panel="file" hidden>
+      <div class="group">
+        <div class="row">
+          <button class="big" data-act="new"><i>📄</i>새 문서</button>
+          <button class="big" data-act="open"><i>📂</i>불러오기</button>
+          <button class="big" data-act="save"><i>💾</i>저장하기<small>.docx</small></button>
+          <button class="big" data-act="print"><i>🖨️</i>인쇄 · PDF</button>
+        </div>
+        <div class="glabel">파일</div>
+      </div>
+    </div>
+
+    <!-- 홈 -->
+    <div class="panel" data-panel="home">
+      <div class="group">
+        <div class="row">
+          <button data-act="undo" title="되돌리기">↶ 되돌리기</button>
+          <button data-act="redo" title="다시 실행">↷ 다시 실행</button>
+        </div>
+        <div class="glabel">편집</div>
+      </div>
+
+      <div class="group">
+        <div class="row">
+          <select id="styleSel" title="스타일">
+            <option value="p">바탕글</option>
+            <option value="h1">제목 1</option>
+            <option value="h2">제목 2</option>
+            <option value="h3">제목 3</option>
+          </select>
+        </div>
+        <div class="glabel">스타일</div>
+      </div>
+
+      <div class="group">
+        <div class="row">
+          <select id="fontSel" title="글꼴">
+            <option value="맑은 고딕">맑은 고딕</option>
+            <option value="바탕">바탕</option>
+            <option value="굴림">굴림</option>
+            <option value="돋움">돋움</option>
+            <option value="궁서">궁서</option>
+            <option value="Nanum Gothic">나눔고딕</option>
+            <option value="Nanum Myeongjo">나눔명조</option>
+            <option value="Noto Sans KR">본고딕</option>
+            <option value="Noto Serif KR">본명조</option>
+          </select>
+          <select id="sizeSel" title="글자 크기"></select>
+        </div>
+        <div class="row">
+          <button class="sq" data-cmd="bold" title="진하게"><b>가</b></button>
+          <button class="sq" data-cmd="italic" title="기울임"><em>가</em></button>
+          <button class="sq" data-cmd="underline" title="밑줄"><u>가</u></button>
+          <button class="sq" data-cmd="strikeThrough" title="취소선"><s>가</s></button>
+          <button class="sq" data-pop="popColor" title="글자 색"><span class="colorA">가</span></button>
+          <button class="sq" data-pop="popHilite" title="형광펜"><span class="hiliteA">가</span></button>
+          <button data-cmd="removeFormat" title="글자 모양 지우기">모양 지우기</button>
+        </div>
+        <div class="glabel">글자 모양</div>
+      </div>
+
+      <div class="group">
+        <div class="row">
+          <button class="sq" data-cmd="justifyLeft" title="왼쪽 정렬"><svg viewBox="0 0 16 16"><path d="M1 3h14M1 6.5h9M1 10h14M1 13.5h9" stroke="currentColor" stroke-width="1.5" fill="none"/></svg></button>
+          <button class="sq" data-cmd="justifyCenter" title="가운데 정렬"><svg viewBox="0 0 16 16"><path d="M1 3h14M4 6.5h8M1 10h14M4 13.5h8" stroke="currentColor" stroke-width="1.5" fill="none"/></svg></button>
+          <button class="sq" data-cmd="justifyRight" title="오른쪽 정렬"><svg viewBox="0 0 16 16"><path d="M1 3h14M6 6.5h9M1 10h14M6 13.5h9" stroke="currentColor" stroke-width="1.5" fill="none"/></svg></button>
+          <button class="sq" data-cmd="justifyFull" title="양쪽 정렬"><svg viewBox="0 0 16 16"><path d="M1 3h14M1 6.5h14M1 10h14M1 13.5h14" stroke="currentColor" stroke-width="1.5" fill="none"/></svg></button>
+          <label class="inl">줄 간격
+            <select id="lineSel" title="줄 간격">
+              <option value="1">100%</option>
+              <option value="1.3">130%</option>
+              <option value="1.6">160%</option>
+              <option value="1.8">180%</option>
+              <option value="2">200%</option>
+              <option value="2.5">250%</option>
+              <option value="3">300%</option>
+            </select>
+          </label>
+        </div>
+        <div class="row">
+          <button data-cmd="insertUnorderedList" title="글머리표">● 글머리표</button>
+          <button data-cmd="insertOrderedList" title="문단 번호">1. 번호</button>
+          <button data-cmd="outdent" title="내어쓰기">⇤ 내어쓰기</button>
+          <button data-cmd="indent" title="들여쓰기">⇥ 들여쓰기</button>
+        </div>
+        <div class="glabel">문단 모양</div>
+      </div>
+
+      <div class="group">
+        <div class="row">
+          <button class="big" data-act="find"><i>🔍</i>찾아 바꾸기</button>
+        </div>
+        <div class="glabel">찾기</div>
+      </div>
+    </div>
+
+    <!-- 입력 -->
+    <div class="panel" data-panel="insert" hidden>
+      <div class="group">
+        <div class="row">
+          <button class="big" data-pop="popTable"><i>▦</i>표</button>
+          <button class="big" data-act="image"><i>🖼️</i>그림</button>
+          <button class="big" data-pop="popChars"><i>※</i>문자표</button>
+          <button class="big" data-act="date"><i>📅</i>날짜</button>
+          <button class="big" data-act="hr"><i>―</i>가로선</button>
+          <button class="big" data-act="pagebreak"><i>⤓</i>쪽 나누기</button>
+        </div>
+        <div class="glabel">입력</div>
+      </div>
+      <div class="group">
+        <div class="row">
+          <button data-act="rowAdd">＋ 줄 추가</button>
+          <button data-act="colAdd">＋ 칸 추가</button>
+        </div>
+        <div class="row">
+          <button data-act="rowDel">－ 줄 지우기</button>
+          <button data-act="colDel">－ 칸 지우기</button>
+          <button data-act="tblDel">표 지우기</button>
+        </div>
+        <div class="glabel">표 편집 (표 안을 누른 뒤 사용)</div>
+      </div>
+    </div>
+
+    <!-- 쪽 -->
+    <div class="panel" data-panel="page" hidden>
+      <div class="group">
+        <div class="row">
+          <button class="big" data-orient="portrait"><i>▯</i>세로</button>
+          <button class="big" data-orient="landscape"><i>▭</i>가로</button>
+        </div>
+        <div class="glabel">용지 방향 (A4)</div>
+      </div>
+      <div class="group">
+        <div class="row">
+          <button class="big" data-margin="narrow"><i>▫</i>좁게</button>
+          <button class="big" data-margin="normal"><i>▫</i>보통</button>
+          <button class="big" data-margin="wide"><i>▫</i>넓게</button>
+        </div>
+        <div class="glabel">쪽 여백</div>
+      </div>
+    </div>
+
+    <!-- 보기 -->
+    <div class="panel" data-panel="view" hidden>
+      <div class="group">
+        <div class="row">
+          <button class="big" data-act="zoomOut"><i>－</i>축소</button>
+          <button class="big" data-act="zoomIn"><i>＋</i>확대</button>
+          <button class="big" data-act="zoom100"><i>1:1</i>100%</button>
+          <button class="big" data-act="zoomFit"><i>↔</i>폭 맞춤</button>
+        </div>
+        <div class="glabel">화면 확대</div>
+      </div>
+      <div class="group">
+        <div class="row">
+          <button class="big" data-act="guides" id="guideBtn"><i>┄</i>쪽 경계</button>
+        </div>
+        <div class="glabel">표시</div>
+      </div>
+    </div>
+  </section>
+
+  <main class="workspace" id="workspace">
+    <div id="holder">
+      <div id="page">
+        <div id="guides"></div>
+        <div id="editor" contenteditable="true" spellcheck="false"></div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="status">
+    <span id="stat"></span>
+    <span class="grow"></span>
+    <button data-act="zoomOut" class="mini">－</button>
+    <span id="zoomLabel">100%</span>
+    <button data-act="zoomIn" class="mini">＋</button>
+  </footer>
+
+  <!-- 팝업 -->
+  <div class="pop" id="popColor" hidden></div>
+  <div class="pop" id="popHilite" hidden></div>
+  <div class="pop" id="popTable" hidden>
+    <div id="tblGrid"></div>
+    <div id="tblLabel">줄 × 칸을 고르세요</div>
+  </div>
+  <div class="pop" id="popChars" hidden></div>
+
+  <div class="dialog" id="findDlg" hidden>
+    <div class="dlgTitle">찾아 바꾸기 <button data-act="findClose" class="mini">✕</button></div>
+    <label>찾을 말 <input id="findText" /></label>
+    <label>바꿀 말 <input id="replText" /></label>
+    <div class="row">
+      <button data-act="findNext">다음 찾기</button>
+      <button data-act="replOne">바꾸기</button>
+      <button data-act="replAll">모두 바꾸기</button>
+    </div>
+  </div>
+
+  <div id="toast" hidden></div>
+  <input type="file" id="fileDocx" accept=".docx" hidden />
+  <input type="file" id="fileImg" accept="image/png,image/jpeg,image/gif" hidden />
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
