@@ -149,10 +149,10 @@ try {
 `;
 const HWP_FORMAT = { hwp: 'HWP', hwpx: 'HWPX', docx: 'OOXML' };
 
-ipcMain.handle('convert', async (_e, { name, data, from, to, dir }) => {
-  if (!HWP_FORMAT[to] || !/^(hwp|hwpx|docx)$/.test(from)) return { ok: false, error: '지원하지 않는 형식' };
-  const r = await askSave(saveOptions(name, to, dir));
-  if (r.canceled || !r.filePath) return { canceled: true };
+const convertible = (from, to) => !!HWP_FORMAT[to] && /^(hwp|hwpx|docx)$/.test(from);
+
+// 바이트를 받아 한글 프로그램으로 변환한 결과 바이트를 돌려준다
+async function hancomConvert(data, from, to) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hangul-editor-'));
   const src = path.join(tmp, `source.${from}`);
   const script = path.join(tmp, 'convert.ps1');
@@ -167,12 +167,32 @@ ipcMain.handle('convert', async (_e, { name, data, from, to, dir }) => {
         (err, stdout, stderr) => (err ? reject(new Error(err.killed ? '시간 초과' : (stderr || err.message).trim().split('\n')[0])) : resolve(stdout)));
     });
     if (!/OK/.test(out) || !fs.existsSync(tmpOut)) throw new Error('변환 실패');
-    fs.copyFileSync(tmpOut, r.filePath);
+    return fs.readFileSync(tmpOut);
+  } finally {
+    fs.rm(tmp, { recursive: true, force: true }, () => {});
+  }
+}
+
+// 변환해서 파일로 저장 (저장 위치를 묻는다)
+ipcMain.handle('convert', async (_e, { name, data, from, to, dir }) => {
+  if (!convertible(from, to)) return { ok: false, error: '지원하지 않는 형식' };
+  const r = await askSave(saveOptions(name, to, dir));
+  if (r.canceled || !r.filePath) return { canceled: true };
+  try {
+    fs.writeFileSync(r.filePath, await hancomConvert(data, from, to));
     return { ok: true, path: r.filePath };
   } catch (e) {
     return { ok: false, error: e.message };
-  } finally {
-    fs.rm(tmp, { recursive: true, force: true }, () => {});
+  }
+});
+
+// 변환한 내용을 화면으로 돌려준다 (워드 문서를 한글 엔진으로 열 때)
+ipcMain.handle('convert-bytes', async (_e, { data, from, to }) => {
+  if (!convertible(from, to)) return { ok: false, error: '지원하지 않는 형식' };
+  try {
+    return { ok: true, data: await hancomConvert(data, from, to) };
+  } catch (e) {
+    return { ok: false, error: e.message };
   }
 });
 

@@ -531,6 +531,14 @@ async function openFile(file, filePath) {
       }
       if (html === null) {
         if (!zip.file('word/document.xml')) throw new Error('지원하지 않는 형식');
+        // 워드에서 만든 문서: 한글 프로그램이 있으면 변환해서 한글 엔진으로 연다 (색·크기·정렬·그림이 살아남)
+        if (desktop && await desktop.hasHancom()) {
+          toast('워드 문서를 여는 중… (한글 프로그램으로 변환합니다)');
+          const conv = await desktop.convertBytes({ data: new Uint8Array(buf), from: 'docx', to: 'hwp' }).catch(() => null);
+          if (conv && conv.ok) {
+            return await openHwp(new Uint8Array(conv.data), file.name, filePath, 'docx');
+          }
+        }
         const mod = await import('mammoth/mammoth.browser.js');
         const mammoth = mod.default || mod;
         html = (await mammoth.convertToHtml({ arrayBuffer: buf })).value;
@@ -671,6 +679,7 @@ function init() {
   initHwp({
     toast, desktop, setMode, pickFile, newDocx,
     getName: docName,
+    setBadge: (t) => { $('#modeBadge').textContent = t; },
     setName: (n) => { $('#docName').value = n; },
   });
 

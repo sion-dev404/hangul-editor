@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('desktop', {
   hasHancom: () => ipcRenderer.invoke('has-hancom'),
   saveFile: (o) => ipcRenderer.invoke('save-file', o),
   convert: (o) => ipcRenderer.invoke('convert', o),
+  convertBytes: (o) => ipcRenderer.invoke('convert-bytes', o),
   openInHangul: (o) => ipcRenderer.invoke('open-in-hangul', o),
   onOpenFile: (cb) => ipcRenderer.on('open-file', (_e, f) => cb(f)),
 });

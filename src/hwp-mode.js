@@ -264,22 +264,29 @@ export async function newDocument() {
   try {
     const s = await ensureStudio();
     await s.commands.execute('file:new-doc', undefined, { allowDialog: true });
-    cur.dir = null; cur.format = 'hwp';
+    cur.dir = null; cur.format = 'hwp'; cur.origin = 'hwp';
     ctx.setName('새 문서');
+    ctx.setBadge('한글 문서');
   } catch (e) { console.error(e); ctx.toast('한글 편집기를 불러오지 못했습니다'); }
   focusDoc();
 }
 
-export async function openHwp(bytes, fileName, filePath) {
+// origin: 'docx'이면 워드 문서를 한글 형식으로 변환해서 여는 경우
+export async function openHwp(bytes, fileName, filePath, origin) {
   ctx.setMode('hwp');
-  ctx.toast('한글 문서를 여는 중…');
+  if (!origin) ctx.toast('한글 문서를 여는 중…');
   const s = await ensureStudio();
   if (await isDirty() && !confirm('지금 문서에 저장하지 않은 내용이 있습니다. 버리고 다른 문서를 열까요?')) return false;
-  const res = await s.loadFile(bytes, fileName, { skipUnsavedGuard: true });
+  const base = fileName.replace(/\.(hwpx?|docx)$/i, '');
+  const res = await s.loadFile(bytes, origin === 'docx' ? `${base}.hwp` : fileName, { skipUnsavedGuard: true });
   cur.format = /\.hwpx$/i.test(fileName) ? 'hwpx' : 'hwp';
+  cur.origin = origin || 'hwp';
   cur.dir = filePath ? filePath.replace(/[\\/][^\\/]*$/, '') : null;
-  ctx.setName(fileName.replace(/\.(hwpx?)$/i, ''));
-  ctx.toast(`문서를 열었습니다 (${res.pageCount}쪽)`);
+  ctx.setName(base);
+  ctx.setBadge(origin === 'docx' ? '워드 문서' : '한글 문서');
+  ctx.toast(origin === 'docx'
+    ? `워드 문서를 열었습니다 (${res.pageCount}쪽). 저장할 때는 파일 탭의 "워드로 저장"을 누르세요`
+    : `문서를 열었습니다 (${res.pageCount}쪽)`);
   focusDoc();
   refreshEnabled();
   return true;
