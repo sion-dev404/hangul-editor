@@ -1,4 +1,5 @@
 import './style.css';
+import { initHwp, openHwp, showHwp, newDocument as newHwpDocument } from './hwp-mode.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -476,7 +477,7 @@ async function saveHwp() {
   toast('한글 문서로 바꾸는 중… (조금 걸립니다)');
   try {
     const out = await buildDocx();
-    const res = await desktop.saveHwp({ name: docName(), data: new Uint8Array(await out.arrayBuffer()) });
+    const res = await desktop.convert({ name: docName(), data: new Uint8Array(await out.arrayBuffer()), from: 'docx', to: 'hwp' });
     if (res.canceled) toast('저장을 취소했습니다');
     else toast(res.ok ? '한글(.hwp)로 저장했습니다' : `한글로 저장하지 못했습니다: ${res.error || ''}`);
   } catch (e) {
@@ -485,27 +486,46 @@ async function saveHwp() {
   }
 }
 
-async function openFile(file) {
+const MODE_KEY = 'hangul-editor-mode';
+function setMode(mode) {
+  document.body.dataset.mode = mode;
+  $('#modeBadge').textContent = mode === 'hwp' ? '한글 문서' : '워드 문서';
+  try { localStorage.setItem(MODE_KEY, mode); } catch { /* 무시 */ }
+  if (mode === 'docx') layout();
+}
+
+function pickFile() {
+  if (desktop) desktop.openDialog().then((f) => { if (f) openFile(new File([f.data], f.name), f.path); });
+  else $('#fileDocx').click();
+}
+
+function newDocx() {
+  setMode('docx');
+  if (editor.innerText.trim() && !confirm('지금 워드 문서를 지우고 새 문서를 만들까요?')) return;
+  setContent(''); $('#docName').value = '새 문서'; savedRange = null;
+  doc.orient = 'portrait'; doc.margin = 'normal';
+  applyPage(); flush();
+}
+
+async function openFile(file, filePath) {
   toast('문서를 여는 중…');
   try {
     const buf = await file.arrayBuffer();
     const sig = new Uint8Array(buf.slice(0, 4));
     let html = null; let pageSt = null;
-    if (sig[0] === 0xd0 && sig[1] === 0xcf && sig[2] === 0x11 && sig[3] === 0xe0) {
-      // 한글 5.0 (.hwp)
-      const { hwpToDoc } = await import('./hwp-import.js');
-      const r = await hwpToDoc(buf);
-      html = r.html; pageSt = r;
-    } else if (sig[0] === 0x50 && sig[1] === 0x4b) {
+    const isCfb = sig[0] === 0xd0 && sig[1] === 0xcf && sig[2] === 0x11 && sig[3] === 0xe0;
+    if (isCfb || /\.hwpx?$/i.test(file.name)) {
+      // 한글 문서는 rhwp 편집기로 연다
+      return await openHwp(new Uint8Array(buf), file.name, filePath);
+    }
+    if (sig[0] === 0x50 && sig[1] === 0x4b) {
       const { default: JSZip } = await import('jszip');
       const zip = await JSZip.loadAsync(buf);
       const own = zip.file(OWN_PART);
       if (zip.file('Contents/section0.xml')) {
-        // 한글 (.hwpx)
-        const { hwpxToDoc } = await import('./hwp-import.js');
-        const r = await hwpxToDoc(zip);
-        html = r.html; pageSt = r;
-      } else if (own) {
+        return await openHwp(new Uint8Array(buf), file.name.replace(/\.[^.]*$/, '') + '.hwpx', filePath);
+      }
+      if (own) {
         const m = />([A-Za-z0-9+/=]+)<\/hangulEditor>/.exec(await own.async('string'));
         if (m) { const data = JSON.parse(b64decode(m[1])); html = data.html; pageSt = data; }
       }
@@ -516,6 +536,7 @@ async function openFile(file) {
         html = (await mammoth.convertToHtml({ arrayBuffer: buf })).value;
       }
     } else throw new Error('지원하지 않는 형식');
+    setMode('docx');
     doc.orient = 'portrait'; doc.margin = 'normal';
     applyPageState(pageSt);
     setContent(sanitize(html));
@@ -528,20 +549,16 @@ async function openFile(file) {
     return true;
   } catch (e) {
     console.error(e);
-    toast('열 수 없는 파일입니다 (.hwp · .hwpx · .docx만 가능, 암호 걸린 문서는 불가)');
+    toast('열 수 없는 파일입니다 (.hwp · .hwpx · .docx만 가능)');
     return false;
   }
 }
 
 /* ---------- 동작 연결 ---------- */
 const actions = {
-  new() {
-    if (editor.innerText.trim() && !confirm('지금 문서를 지우고 새 문서를 만들까요?')) return;
-    setContent(''); $('#docName').value = '새 문서'; savedRange = null;
-    doc.orient = 'portrait'; doc.margin = 'normal';
-    applyPage(); flush();
-  },
-  open() { $('#fileDocx').click(); },
+  new() { newDocx(); },
+  newHwp() { newHwpDocument(); },
+  open() { pickFile(); },
   save() { saveDocx(); },
   saveHwp() { saveHwp(); },
   print() { flush(); window.print(); },
@@ -578,6 +595,7 @@ function closePops(except) {
 }
 
 function init() {
+  document.body.dataset.mode = 'docx'; // 시작 모드는 아래 startMode에서 정한다
   // 고르기 상자 채우기
   $('#sizeSel').innerHTML = SIZES.map((s) => `<option value="${s}">${s}pt</option>`).join('');
   $('#popColor').innerHTML = `<div class="swatches">${COLORS.map((c) => `<button data-color="${c}" style="background:${c}" title="${c}"></button>`).join('')}</div>`;
@@ -650,13 +668,29 @@ function init() {
     if (f && /\.(docx|hwpx?)$/i.test(f.name)) { e.preventDefault(); openFile(f); }
   });
 
+  initHwp({
+    toast, desktop, setMode, pickFile, newDocx,
+    getName: docName,
+    setName: (n) => { $('#docName').value = n; },
+  });
+
   // 설치형(.exe) 전용 기능
+  let startedWithFile = false;
   if (desktop) {
-    const openFromDesktop = (f) => { if (f) openFile(new File([f.data], f.name)); };
+    const openFromDesktop = (f) => { if (f) { startedWithFile = true; openFile(new File([f.data], f.name), f.path); } };
     desktop.onOpenFile(openFromDesktop);
-    desktop.initialFile().then(openFromDesktop);
+    desktop.initialFile().then((f) => { openFromDesktop(f); if (!f) startMode(); });
     desktop.hasHancom().then((yes) => { $('#saveHwpBtn').hidden = !yes; });
   }
+
+  // 처음 화면: 지난번에 쓰던 종류로, 없으면 한글 문서로 시작
+  function startMode() {
+    if (startedWithFile) return;
+    let last = 'hwp';
+    try { last = localStorage.getItem(MODE_KEY) || 'hwp'; } catch { /* 무시 */ }
+    if (last === 'docx') setMode('docx'); else showHwp();
+  }
+  if (!desktop) startMode();
   $('#fileImg').addEventListener('change', (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) insertImage(f); });
 
   editor.addEventListener('input', changed);

@@ -1,7 +1,7 @@
 {
   "name": "hangul-editor",
   "private": true,
-  "version": "1.1.0",
+  "version": "2.0.0",
   "description": "한글 문서를 워드 방식으로 편집하는 프로그램",
   "author": "sion-dev404",
   "type": "module",
@@ -14,6 +14,8 @@
     "dist": "vite build && electron-builder --win"
   },
   "devDependencies": {
+    "@rhwp/core": "^0.9.0",
+    "@rhwp/editor": "^0.9.0",
     "docx": "^9.5.1",
     "electron": "^33.0.0",
     "electron-builder": "^25.1.8",

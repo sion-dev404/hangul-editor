@@ -13,9 +13,16 @@
   <header class="titlebar">
     <span class="logo">한</span>
     <input id="docName" value="새 문서" aria-label="문서 이름" />
+    <span id="modeBadge"></span>
     <span id="saveState">자동 저장됨</span>
   </header>
 
+  <div id="hwpUi">
+    <nav class="tabs" id="hwpTabs"></nav>
+    <section class="ribbon" id="hwpRibbon"></section>
+  </div>
+
+  <div id="docxUi">
   <nav class="tabs" id="tabs">
     <button data-tab="file">파일</button>
     <button data-tab="home" class="on">홈</button>
@@ -29,7 +36,8 @@
     <div class="panel" data-panel="file" hidden>
       <div class="group">
         <div class="row">
-          <button class="big" data-act="new"><i>📄</i>새 문서</button>
+          <button class="big" data-act="newHwp"><i>📄</i>새 한글 문서</button>
+          <button class="big" data-act="new"><i>📝</i>새 워드 문서</button>
           <button class="big" data-act="open"><i>📂</i>불러오기<small>.hwp .hwpx .docx</small></button>
           <button class="big" data-act="save"><i>💾</i>워드로 저장<small>.docx</small></button>
           <button class="big" data-act="saveHwp" id="saveHwpBtn" hidden><i>💾</i>한글로 저장<small>.hwp</small></button>
@@ -188,6 +196,9 @@
       </div>
     </div>
   </section>
+  </div>
+
+  <div id="studioHost"></div>
 
   <main class="workspace" id="workspace">
     <div id="holder">
@@ -198,7 +209,7 @@
     </div>
   </main>
 
-  <footer class="status">
+  <footer class="status" id="docxStatus">
     <span id="stat"></span>
     <span class="grow"></span>
     <button data-act="zoomOut" class="mini">－</button>
