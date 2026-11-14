@@ -30,8 +30,9 @@
       <div class="group">
         <div class="row">
           <button class="big" data-act="new"><i>📄</i>새 문서</button>
-          <button class="big" data-act="open"><i>📂</i>불러오기</button>
-          <button class="big" data-act="save"><i>💾</i>저장하기<small>.docx</small></button>
+          <button class="big" data-act="open"><i>📂</i>불러오기<small>.hwp .hwpx .docx</small></button>
+          <button class="big" data-act="save"><i>💾</i>워드로 저장<small>.docx</small></button>
+          <button class="big" data-act="saveHwp" id="saveHwpBtn" hidden><i>💾</i>한글로 저장<small>.hwp</small></button>
           <button class="big" data-act="print"><i>🖨️</i>인쇄 · PDF</button>
         </div>
         <div class="glabel">파일</div>
@@ -226,7 +227,7 @@
   </div>
 
   <div id="toast" hidden></div>
-  <input type="file" id="fileDocx" accept=".docx" hidden />
+  <input type="file" id="fileDocx" accept=".docx,.hwp,.hwpx" hidden />
   <input type="file" id="fileImg" accept="image/png,image/jpeg,image/gif" hidden />
 
   <script type="module" src="/src/main.js"></script>

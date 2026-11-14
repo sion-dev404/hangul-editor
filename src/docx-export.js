@@ -118,20 +118,38 @@ function listItems(listEl, level, out, root, instance) {
 }
 
 function makeTable(table, root) {
+  // 칸의 실제 위치로 세로 격자선을 구한다 (한글·워드 모두 칸 너비 정보가 있어야 표를 제대로 읽는다)
+  const raw = [];
+  for (const tr of table.rows) for (const td of tr.cells) raw.push(td.offsetLeft, td.offsetLeft + td.offsetWidth);
+  raw.sort((a, b) => a - b);
+  const edges = [];
+  for (const x of raw) if (!edges.length || x - edges[edges.length - 1] > 2) edges.push(x);
+  if (edges.length < 2) edges.push((edges[0] || 0) + 100);
+  const near = (x) => edges.reduce((best, e, i) => (Math.abs(e - x) < Math.abs(edges[best] - x) ? i : best), 0);
+  const columnWidths = edges.slice(1).map((e, i) => Math.max(1, Math.round((e - edges[i]) * PX2TWIP)));
+
   const rows = [...table.rows].map((tr) => new TableRow({
     children: [...tr.cells].map((td) => {
       const kids = [];
       blocks(td, { indent: 0 }, kids, root);
       if (!kids.length || kids[kids.length - 1] instanceof Table) kids.push(new Paragraph({}));
-      const opt = { children: kids };
-      if (td.colSpan > 1) opt.columnSpan = td.colSpan;
+      const a = near(td.offsetLeft);
+      const span = Math.max(1, near(td.offsetLeft + td.offsetWidth) - a);
+      const opt = {
+        children: kids,
+        width: { size: columnWidths.slice(a, a + span).reduce((s, v) => s + v, 0), type: WidthType.DXA },
+      };
+      if (span > 1) opt.columnSpan = span;
       if (td.rowSpan > 1) opt.rowSpan = td.rowSpan;
       const bg = hex(getComputedStyle(td).backgroundColor);
       if (bg) opt.shading = { type: ShadingType.CLEAR, fill: bg, color: 'auto' };
       return new TableCell(opt);
     }),
   }));
-  return new Table({ rows, width: { size: 100, type: WidthType.PERCENTAGE } });
+  return new Table({
+    rows, columnWidths,
+    width: { size: columnWidths.reduce((s, v) => s + v, 0), type: WidthType.DXA },
+  });
 }
 
 function hasBlockChild(el) {

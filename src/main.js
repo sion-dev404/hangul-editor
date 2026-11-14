@@ -14,7 +14,21 @@ const MARGINS = {
   narrow: { t: 15, b: 15, l: 15, r: 15 },
   normal: { t: 20, b: 15, l: 30, r: 30 },
   wide: { t: 30, b: 30, l: 40, r: 40 },
+  custom: { t: 20, b: 15, l: 30, r: 30 }, // 불러온 문서의 여백
 };
+const desktop = window.desktop || null; // 설치형(.exe)에서만 있음
+
+function pageState() {
+  return { orient: doc.orient, margin: doc.margin, m: MARGINS[doc.margin] };
+}
+function applyPageState(s) {
+  if (!s) return;
+  if (s.orient === 'portrait' || s.orient === 'landscape') doc.orient = s.orient;
+  const ok = s.m && ['t', 'b', 'l', 'r'].every((k) => Number.isFinite(+s.m[k]) && +s.m[k] >= 0 && +s.m[k] <= 100);
+  if (s.margin === 'custom' || (!s.margin && ok)) {
+    if (ok) { MARGINS.custom = { t: +s.m.t, b: +s.m.b, l: +s.m.l, r: +s.m.r }; doc.margin = 'custom'; }
+  } else if (MARGINS[s.margin]) doc.margin = s.margin;
+}
 const SIZES = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 40, 48];
 const COLORS = ['#000000', '#444444', '#888888', '#ffffff', '#c00000', '#ff0000', '#ffc000', '#ffff00', '#92d050', '#00b050', '#00b0f0', '#0070c0', '#002060', '#7030a0'];
 const HILITES = ['transparent', '#ffff00', '#00ff00', '#00ffff', '#ff99cc', '#ffc000', '#d9d9d9'];
@@ -135,9 +149,7 @@ function step(d) {
 
 function autosave() {
   try {
-    localStorage.setItem(STORE, JSON.stringify({
-      html: editor.innerHTML, name: $('#docName').value, orient: doc.orient, margin: doc.margin,
-    }));
+    localStorage.setItem(STORE, JSON.stringify({ html: editor.innerHTML, name: $('#docName').value, ...pageState() }));
     $('#saveState').textContent = '자동 저장됨';
   } catch {
     $('#saveState').textContent = '자동 저장 불가 (용량 초과)';
@@ -415,21 +427,35 @@ function b64decode(b64) {
   return new TextDecoder().decode(bytes);
 }
 
-async function saveDocx() {
+function docName() {
+  return ($('#docName').value.trim() || '새 문서').replace(/[\\/:*?"<>|]/g, '_');
+}
+
+async function buildDocx() {
   flush();
+  const name = docName();
+  const [{ exportDocx }, { default: JSZip }] = await Promise.all([import('./docx-export.js'), import('jszip')]);
+  const blob = await exportDocx(editor, { name, orient: doc.orient, m: MARGINS[doc.margin] });
+  // 이 편집기에서 다시 열 때 모양이 그대로 살아나도록 원본을 함께 넣어 둔다
+  const zip = await JSZip.loadAsync(blob);
+  const payload = b64encode(JSON.stringify({ html: editor.innerHTML, ...pageState() }));
+  zip.file(OWN_PART, `<?xml version="1.0" encoding="UTF-8"?><hangulEditor xmlns="urn:hangul-editor" version="1">${payload}</hangulEditor>`);
+  return zip.generateAsync({
+    type: 'blob', compression: 'DEFLATE',
+    mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  });
+}
+
+async function saveDocx() {
   toast('문서를 만드는 중…');
   try {
-    const name = ($('#docName').value.trim() || '새 문서').replace(/[\\/:*?"<>|]/g, '_');
-    const [{ exportDocx }, { default: JSZip }] = await Promise.all([import('./docx-export.js'), import('jszip')]);
-    const blob = await exportDocx(editor, { name, orient: doc.orient, m: MARGINS[doc.margin] });
-    // 이 편집기에서 다시 열 때 모양이 그대로 살아나도록 원본을 함께 넣어 둔다
-    const zip = await JSZip.loadAsync(blob);
-    const payload = b64encode(JSON.stringify({ html: editor.innerHTML, orient: doc.orient, margin: doc.margin }));
-    zip.file(OWN_PART, `<?xml version="1.0" encoding="UTF-8"?><hangulEditor xmlns="urn:hangul-editor" version="1">${payload}</hangulEditor>`);
-    const out = await zip.generateAsync({
-      type: 'blob', compression: 'DEFLATE',
-      mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    });
+    const name = docName();
+    const out = await buildDocx();
+    if (desktop) {
+      const saved = await desktop.saveFile({ name, ext: 'docx', data: new Uint8Array(await out.arrayBuffer()) });
+      toast(saved ? '저장했습니다' : '저장을 취소했습니다');
+      return out;
+    }
     const a = document.createElement('a');
     a.href = URL.createObjectURL(out);
     a.download = `${name}.docx`;
@@ -444,37 +470,66 @@ async function saveDocx() {
   }
 }
 
-async function openDocx(file) {
+// 한글(.hwp)로 저장 — 설치형에서, 이 PC에 한컴오피스 한글이 있을 때만
+async function saveHwp() {
+  if (!desktop) return;
+  toast('한글 문서로 바꾸는 중… (조금 걸립니다)');
+  try {
+    const out = await buildDocx();
+    const res = await desktop.saveHwp({ name: docName(), data: new Uint8Array(await out.arrayBuffer()) });
+    if (res.canceled) toast('저장을 취소했습니다');
+    else toast(res.ok ? '한글(.hwp)로 저장했습니다' : `한글로 저장하지 못했습니다: ${res.error || ''}`);
+  } catch (e) {
+    console.error(e);
+    toast('한글로 저장하지 못했습니다');
+  }
+}
+
+async function openFile(file) {
   toast('문서를 여는 중…');
   try {
     const buf = await file.arrayBuffer();
-    const { default: JSZip } = await import('jszip');
-    const zip = await JSZip.loadAsync(buf);
-    const own = zip.file(OWN_PART);
-    let html = null;
-    if (own) {
-      const m = />([A-Za-z0-9+/=]+)<\/hangulEditor>/.exec(await own.async('string'));
-      if (m) {
-        const data = JSON.parse(b64decode(m[1]));
-        html = data.html;
-        if (data.orient === 'portrait' || data.orient === 'landscape') doc.orient = data.orient;
-        if (MARGINS[data.margin]) doc.margin = data.margin;
+    const sig = new Uint8Array(buf.slice(0, 4));
+    let html = null; let pageSt = null;
+    if (sig[0] === 0xd0 && sig[1] === 0xcf && sig[2] === 0x11 && sig[3] === 0xe0) {
+      // 한글 5.0 (.hwp)
+      const { hwpToDoc } = await import('./hwp-import.js');
+      const r = await hwpToDoc(buf);
+      html = r.html; pageSt = r;
+    } else if (sig[0] === 0x50 && sig[1] === 0x4b) {
+      const { default: JSZip } = await import('jszip');
+      const zip = await JSZip.loadAsync(buf);
+      const own = zip.file(OWN_PART);
+      if (zip.file('Contents/section0.xml')) {
+        // 한글 (.hwpx)
+        const { hwpxToDoc } = await import('./hwp-import.js');
+        const r = await hwpxToDoc(zip);
+        html = r.html; pageSt = r;
+      } else if (own) {
+        const m = />([A-Za-z0-9+/=]+)<\/hangulEditor>/.exec(await own.async('string'));
+        if (m) { const data = JSON.parse(b64decode(m[1])); html = data.html; pageSt = data; }
       }
-    }
-    if (html === null) {
-      const mod = await import('mammoth/mammoth.browser.js');
-      const mammoth = mod.default || mod;
-      html = (await mammoth.convertToHtml({ arrayBuffer: buf })).value;
-    }
+      if (html === null) {
+        if (!zip.file('word/document.xml')) throw new Error('지원하지 않는 형식');
+        const mod = await import('mammoth/mammoth.browser.js');
+        const mammoth = mod.default || mod;
+        html = (await mammoth.convertToHtml({ arrayBuffer: buf })).value;
+      }
+    } else throw new Error('지원하지 않는 형식');
+    doc.orient = 'portrait'; doc.margin = 'normal';
+    applyPageState(pageSt);
     setContent(sanitize(html));
-    $('#docName').value = file.name.replace(/\.docx$/i, '');
+    $('#docName').value = file.name.replace(/\.(docx|hwpx?)$/i, '');
     savedRange = null;
+    hist.stack = []; hist.i = -1;
     applyPage(); flush();
     workspace.scrollTop = 0;
     toast('문서를 열었습니다');
+    return true;
   } catch (e) {
     console.error(e);
-    toast('열 수 없는 파일입니다 (.docx만 가능)');
+    toast('열 수 없는 파일입니다 (.hwp · .hwpx · .docx만 가능, 암호 걸린 문서는 불가)');
+    return false;
   }
 }
 
@@ -488,6 +543,7 @@ const actions = {
   },
   open() { $('#fileDocx').click(); },
   save() { saveDocx(); },
+  saveHwp() { saveHwp(); },
   print() { flush(); window.print(); },
   undo() { step(-1); },
   redo() { step(1); },
@@ -585,7 +641,22 @@ function init() {
   $('#docName').addEventListener('input', autosave);
   $('#findText').addEventListener('input', () => { find.node = null; });
 
-  $('#fileDocx').addEventListener('change', (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) openDocx(f); });
+  $('#fileDocx').addEventListener('change', (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) openFile(f); });
+
+  // 문서 파일을 창에 끌어다 놓아도 열린다
+  addEventListener('dragover', (e) => { if (e.dataTransfer?.types.includes('Files')) e.preventDefault(); });
+  addEventListener('drop', (e) => {
+    const f = e.dataTransfer?.files?.[0];
+    if (f && /\.(docx|hwpx?)$/i.test(f.name)) { e.preventDefault(); openFile(f); }
+  });
+
+  // 설치형(.exe) 전용 기능
+  if (desktop) {
+    const openFromDesktop = (f) => { if (f) openFile(new File([f.data], f.name)); };
+    desktop.onOpenFile(openFromDesktop);
+    desktop.initialFile().then(openFromDesktop);
+    desktop.hasHancom().then((yes) => { $('#saveHwpBtn').hidden = !yes; });
+  }
   $('#fileImg').addEventListener('change', (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) insertImage(f); });
 
   editor.addEventListener('input', changed);
@@ -610,8 +681,7 @@ function init() {
     if (saved) {
       setContent(sanitize(saved.html || ''));
       if (saved.name) $('#docName').value = saved.name;
-      if (saved.orient === 'landscape') doc.orient = 'landscape';
-      if (MARGINS[saved.margin]) doc.margin = saved.margin;
+      applyPageState(saved);
     } else setContent('');
   } catch { setContent(''); }
 
@@ -627,4 +697,4 @@ function init() {
 init();
 
 // 동작 확인용 (화면에는 영향 없음)
-window.__editor = { saveDocx, openDocx };
+window.__editor = { saveDocx, openFile };
