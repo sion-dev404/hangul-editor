@@ -1,0 +1,25 @@
+diff --git a/src/renderer/layout/shape_item.inc.rs b/src/renderer/layout/shape_item.inc.rs
+index ca363dd4..f0561eeb 100644
+--- a/src/renderer/layout/shape_item.inc.rs
++++ b/src/renderer/layout/shape_item.inc.rs
+@@ -382,6 +382,20 @@ impl LayoutEngine {
+                             ) {
+                                 result_y = saved_y_offset;
+                             }
++                            // The legacy non-advancing path above is evidence for an
++                            // *empty* host only. When the host paragraph paints visible
++                            // text, its line has already advanced the flow cursor; a
++                            // behind-text backdrop must not rewind it, or the next
++                            // paragraph is painted on top of the host's own text line.
++                            if matches!(
++                                pic.common.text_wrap,
++                                crate::model::shape::TextWrap::BehindText
++                            ) && !pic.common.treat_as_char
++                                && para_has_non_whitespace_text(para)
++                                && saved_y_offset.is_finite()
++                            {
++                                result_y = result_y.max(saved_y_offset);
++                            }
+                             // A co-anchored fixed title needs the otherwise
+                             // empty host's content line. Keep ordinary BehindText
+                             // logo hosts on the legacy path described above.
