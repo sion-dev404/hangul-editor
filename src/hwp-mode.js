@@ -225,19 +225,20 @@ async function save(fmt) {
   }
 }
 
+// 한글 문서를 워드(.docx)로 저장 — 한글 프로그램 없이 직접 변환한다
 async function saveDocx() {
   const s = await ensureStudio();
-  if (ctx.desktop && await ctx.desktop.hasHancom()) {
-    ctx.toast('워드 문서로 바꾸는 중… (한글 프로그램을 이용합니다)');
-    try {
-      const res = await ctx.desktop.convert({ name: ctx.getName(), data: await s.exportHwp(), from: 'hwp', to: 'docx', dir: cur.dir });
-      if (res.canceled) ctx.toast('저장을 취소했습니다');
-      else ctx.toast(res.ok ? '워드(.docx)로 저장했습니다' : `워드로 저장하지 못했습니다: ${res.error || ''}`);
-    } catch (e) { console.error(e); ctx.toast('워드로 저장하지 못했습니다'); }
-    return;
+  ctx.toast('워드 문서로 바꾸는 중…');
+  try {
+    const name = ctx.getName();
+    const blob = await ctx.hwpxToDocxBlob(await s.exportHwpx(), name);
+    const saved = await ctx.saveBytes(new Uint8Array(await blob.arrayBuffer()), name, 'docx',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    ctx.toast(saved ? '워드(.docx)로 저장했습니다' : '저장을 취소했습니다');
+  } catch (e) {
+    console.error(e);
+    ctx.toast('워드로 저장하지 못했습니다');
   }
-  // 한글 프로그램이 없으면 rhwp의 워드(.doc) 내보내기를 쓴다
-  runCommand('file:export-doc');
 }
 
 async function openInHangul() {
@@ -300,7 +301,12 @@ export async function showHwp() {
 export function initHwp(context) {
   ctx = context;
   buildRibbon();
-  if (ctx.desktop) ribbonEl.querySelectorAll('[data-desktop-only]').forEach((b) => { b.hidden = false; });
+  // "한글에서 열어 보기"는 이 PC에 한글 프로그램이 있을 때만 보인다
+  if (ctx.desktop) {
+    ctx.desktop.hasHancom().then((yes) => {
+      ribbonEl.querySelectorAll('[data-desktop-only]').forEach((b) => { b.hidden = !yes; });
+    });
+  }
   tabsEl.addEventListener('click', (e) => {
     const t = e.target.closest('[data-htab]');
     if (!t) return;

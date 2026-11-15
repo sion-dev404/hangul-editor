@@ -81,26 +81,26 @@ button, select, input { font-family: inherit; font-size: inherit; }
   position: relative; background: #fff; box-shadow: 0 1px 6px rgba(0,0,0,.25);
   transform-origin: 0 0;
 }
-#editor {
+:is(#editor, #exportStage) {
   outline: none; position: relative;
   font-family: '맑은 고딕', 'Malgun Gothic', 'Noto Sans KR', sans-serif;
   font-size: 10pt; line-height: 1.6; color: #000;
   word-break: break-all; overflow-wrap: anywhere;
 }
-#editor p { margin: 0; }
-#editor h1 { font-size: 20pt; margin: 0 0 6pt; line-height: 1.4; }
-#editor h2 { font-size: 16pt; margin: 0 0 4pt; line-height: 1.4; }
-#editor h3 { font-size: 13pt; margin: 0 0 3pt; line-height: 1.4; }
-#editor ul, #editor ol { margin: 0; padding-left: 28px; }
-#editor blockquote { margin: 0 0 0 40px; padding: 0; border: 0; }
-#editor table { border-collapse: collapse; width: 100%; table-layout: fixed; margin: 4px 0; }
-#editor td, #editor th { border: 1px solid #000; padding: 3px 6px; vertical-align: top; min-height: 1.6em; }
-#editor img { max-width: 100%; height: auto; }
-#editor hr { border: 0; border-top: 1px solid #000; margin: 8px 0; }
-#editor .page-break {
+:is(#editor, #exportStage) p { margin: 0; }
+:is(#editor, #exportStage) h1 { font-size: 20pt; margin: 0 0 6pt; line-height: 1.4; }
+:is(#editor, #exportStage) h2 { font-size: 16pt; margin: 0 0 4pt; line-height: 1.4; }
+:is(#editor, #exportStage) h3 { font-size: 13pt; margin: 0 0 3pt; line-height: 1.4; }
+:is(#editor, #exportStage) ul, :is(#editor, #exportStage) ol { margin: 0; padding-left: 28px; }
+:is(#editor, #exportStage) blockquote { margin: 0 0 0 40px; padding: 0; border: 0; }
+:is(#editor, #exportStage) table { border-collapse: collapse; width: 100%; table-layout: fixed; margin: 4px 0; }
+:is(#editor, #exportStage) td, :is(#editor, #exportStage) th { border: 1px solid #000; padding: 3px 6px; vertical-align: top; min-height: 1.6em; }
+:is(#editor, #exportStage) img { max-width: 100%; height: auto; }
+:is(#editor, #exportStage) hr { border: 0; border-top: 1px solid #000; margin: 8px 0; }
+:is(#editor, #exportStage) .page-break {
   border-top: 2px dashed #7f9fd6; margin: 10px 0; height: 0; position: relative; user-select: none;
 }
-#editor .page-break::after {
+:is(#editor, #exportStage) .page-break::after {
   content: '쪽 나누기'; position: absolute; right: 0; top: -9px; background: #fff;
   color: #5f82c0; font-size: 11px; padding: 0 6px; font-family: var(--ui); line-height: 16px;
 }
@@ -169,9 +169,9 @@ button, select, input { font-family: inherit; font-size: inherit; }
     transform: none !important; box-shadow: none; width: auto !important;
     min-height: 0 !important; padding: 0 !important;
   }
-  #editor { min-height: 0 !important; }
-  #editor .page-break { border: 0; margin: 0; break-after: page; }
-  #editor .page-break::after { display: none; }
+  :is(#editor, #exportStage) { min-height: 0 !important; }
+  :is(#editor, #exportStage) .page-break { border: 0; margin: 0; break-after: page; }
+  :is(#editor, #exportStage) .page-break::after { display: none; }
 }
 
 /* 한글 문서 모드 (rhwp) */
@@ -191,3 +191,6 @@ body[data-mode="docx"] #hwpUi, body[data-mode="docx"] #studioHost { display: non
 .ribbon button.sq sup, .ribbon button.sq sub { font-size: 9px; }
 
 .ribbon { scrollbar-width: thin; }
+
+/* 한글 → 워드 저장 때 화면 밖에서 문서를 그려 모양을 읽는 곳 */
+#exportStage { position: fixed; left: -30000px; top: 0; visibility: hidden; pointer-events: none; }

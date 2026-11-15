@@ -108,6 +108,8 @@ ipcMain.handle('open-dialog', async () => {
 });
 
 function hasHancom() {
+  // 점검용: 한글 프로그램이 없는 PC처럼 동작시킨다
+  if (process.env.HANGUL_EDITOR_NO_HANCOM === '1') return Promise.resolve(false);
   return new Promise((resolve) => {
     execFile('reg', ['query', 'HKCR\\HWPFrame.HwpObject'], { windowsHide: true }, (err) => resolve(!err));
   });

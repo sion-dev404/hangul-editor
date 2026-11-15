@@ -204,6 +204,14 @@ function setZoom(z) {
   doc.zoom = Math.min(3, Math.max(0.3, Math.round(z * 100) / 100));
   layout();
 }
+// 사용자가 확대를 직접 바꾸기 전까지는 화면 폭에 맞춰 자동으로 정한다
+// (워드 화면이 숨겨진 동안에는 폭이 0이라 계산하지 않는다)
+let userZoomed = false;
+function autoZoom() {
+  if (userZoomed || !workspace.clientWidth) return;
+  const w = workspace.clientWidth - 24;
+  setZoom(w < page.offsetWidth ? w / page.offsetWidth : 1);
+}
 function fitZoom() {
   setZoom((workspace.clientWidth - 24) / page.offsetWidth);
 }
@@ -471,18 +479,141 @@ async function saveDocx() {
   }
 }
 
-// 한글(.hwp)로 저장 — 설치형에서, 이 PC에 한컴오피스 한글이 있을 때만
+/* ---------- 형식 변환 (한글 프로그램 없이) ---------- */
+const INLINE_TAGS = new Set(['SPAN', 'FONT', 'B', 'STRONG', 'I', 'EM', 'U', 'S', 'STRIKE', 'SUP', 'SUB', 'A', 'MARK', 'SMALL', 'BIG']);
+const BLOCK_TAGS = new Set(['P', 'H1', 'H2', 'H3', 'LI', 'TD', 'TH', 'DIV', 'BLOCKQUOTE']);
+const px2pt = (v) => Math.round(parseFloat(v) * 0.75 * 10) / 10;
+
+function cssColor(v) {
+  const m = /rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/.exec(v || '');
+  if (!m || (m[4] !== undefined && parseFloat(m[4]) === 0)) return null;
+  return `#${[m[1], m[2], m[3]].map((x) => (+x).toString(16).padStart(2, '0')).join('')}`;
+}
+
+// 화면에 보이는 모양을 그대로 글자마다 적어 넣은 HTML을 만든다 (한글 엔진에 붙여 넣을 때 기본값이 끼어들지 않게)
+function explicitHtml(root) {
+  const out = document.createElement('div');
+  const textCss = (el) => {
+    const cs = getComputedStyle(el);
+    const css = [
+      `font-family:'${cs.fontFamily.split(',')[0].trim().replace(/^["']|["']$/g, '')}'`,
+      `font-size:${px2pt(cs.fontSize)}pt`,
+    ];
+    const color = cssColor(cs.color); if (color) css.push(`color:${color}`);
+    if (parseInt(cs.fontWeight, 10) >= 600) css.push('font-weight:bold');
+    if (cs.fontStyle === 'italic') css.push('font-style:italic');
+    let underline = false; let strike = false; let bg = null;
+    for (let n = el; n && n !== root && !BLOCK_TAGS.has(n.tagName); n = n.parentElement) {
+      const c = getComputedStyle(n);
+      const deco = c.textDecorationLine || '';
+      if (deco.includes('underline')) underline = true;
+      if (deco.includes('line-through')) strike = true;
+      if (!bg) bg = cssColor(c.backgroundColor);
+    }
+    const deco = [underline && 'underline', strike && 'line-through'].filter(Boolean).join(' ');
+    if (deco) css.push(`text-decoration:${deco}`);
+    if (bg) css.push(`background-color:${bg}`);
+    if (cs.verticalAlign === 'super' || cs.verticalAlign === 'sub') css.push(`vertical-align:${cs.verticalAlign}`);
+    return css.join(';');
+  };
+  const blockCss = (el) => {
+    const cs = getComputedStyle(el);
+    const css = [`text-align:${cs.textAlign === 'start' ? 'left' : cs.textAlign}`];
+    const lh = parseFloat(cs.lineHeight); const fs = parseFloat(cs.fontSize);
+    if (Number.isFinite(lh) && fs) css.push(`line-height:${Math.round((lh / fs) * 100)}%`);
+    for (const [k, v] of [['margin-left', cs.marginLeft], ['text-indent', cs.textIndent], ['margin-top', cs.marginTop], ['margin-bottom', cs.marginBottom]]) {
+      if (parseFloat(v)) css.push(`${k}:${px2pt(v)}pt`);
+    }
+    const bg = cssColor(cs.backgroundColor);
+    if (bg && bg !== '#ffffff') css.push(`background-color:${bg}`);
+    return css.join(';');
+  };
+  // 목록은 한글 엔진이 번호를 글머리표로 바꾸므로, 번호·글머리를 글자로 적은 문단으로 바꿔 넣는다
+  const rootLeft = root.getBoundingClientRect().left;
+  const list = (ul, target) => {
+    let no = 0;
+    for (const li of ul.children) {
+      if (li.tagName !== 'LI') continue;
+      no += 1;
+      const p = document.createElement('p');
+      const indent = (li.getBoundingClientRect().left - rootLeft) / (doc.zoom || 1);
+      p.setAttribute('style', `${blockCss(li).replace(/margin-left:[^;]*;?/, '')};margin-left:${px2pt(indent)}pt`);
+      const mark = document.createElement('span');
+      mark.setAttribute('style', textCss(li));
+      mark.textContent = ul.tagName === 'OL' ? `${no}. ` : '• ';
+      p.append(mark);
+      const nested = [...li.children].filter((c) => c.tagName === 'UL' || c.tagName === 'OL');
+      walk({ childNodes: [...li.childNodes].filter((c) => !nested.includes(c)) }, p);
+      target.append(p);
+      for (const n of nested) list(n, target);
+    }
+  };
+  const walk = (node, target) => {
+    for (const n of node.childNodes) {
+      if (n.nodeType === 1 && (n.tagName === 'UL' || n.tagName === 'OL')) { list(n, target); continue; }
+      if (n.nodeType === 3) {
+        if (!n.data) continue;
+        const s = document.createElement('span');
+        s.setAttribute('style', textCss(n.parentElement));
+        s.textContent = n.data.replace(/ /g, ' ');
+        target.append(s);
+        continue;
+      }
+      if (n.nodeType !== 1) continue;
+      if (INLINE_TAGS.has(n.tagName)) { walk(n, target); continue; }
+      const c = n.cloneNode(false);
+      if (BLOCK_TAGS.has(n.tagName) && !n.classList.contains('page-break')) c.setAttribute('style', blockCss(n));
+      target.append(c);
+      walk(n, c);
+    }
+  };
+  walk(root, out);
+  return out.innerHTML;
+}
+
+async function saveBytes(bytes, name, ext, mime) {
+  if (desktop) return desktop.saveFile({ name, ext, data: bytes });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([bytes], { type: mime }));
+  a.download = `${name}.${ext}`;
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  return `${name}.${ext}`;
+}
+
+// 워드 화면의 문서를 한글(.hwp)로 저장 — 한글 프로그램 없이 rhwp 엔진으로 만든다
 async function saveHwp() {
-  if (!desktop) return;
-  toast('한글 문서로 바꾸는 중… (조금 걸립니다)');
+  flush();
+  toast('한글 문서로 바꾸는 중…');
   try {
-    const out = await buildDocx();
-    const res = await desktop.convert({ name: docName(), data: new Uint8Array(await out.arrayBuffer()), from: 'docx', to: 'hwp' });
-    if (res.canceled) toast('저장을 취소했습니다');
-    else toast(res.ok ? '한글(.hwp)로 저장했습니다' : `한글로 저장하지 못했습니다: ${res.error || ''}`);
+    const { htmlToHwp } = await import('./engine.js');
+    const bytes = await htmlToHwp(explicitHtml(editor), { orient: doc.orient, m: MARGINS[doc.margin] }, 'hwp');
+    const saved = await saveBytes(bytes, docName(), 'hwp', 'application/x-hwp');
+    toast(saved ? '한글(.hwp)로 저장했습니다' : '저장을 취소했습니다');
+    return bytes;
   } catch (e) {
     console.error(e);
     toast('한글로 저장하지 못했습니다');
+    return null;
+  }
+}
+
+// 한글 문서(.hwpx 바이트)를 워드(.docx)로 — 한글 화면의 "워드로 저장"에서 쓴다
+async function hwpxToDocxBlob(hwpxBytes, name) {
+  const [{ default: JSZip }, { hwpxToDoc }, { exportDocx }] = await Promise.all([
+    import('jszip'), import('./hwpx-import.js'), import('./docx-export.js'),
+  ]);
+  const r = await hwpxToDoc(await JSZip.loadAsync(hwpxBytes));
+  const orient = r.orient === 'landscape' ? 'landscape' : 'portrait';
+  const m = r.m || MARGINS.normal;
+  const stage = $('#exportStage');
+  stage.style.width = `${((orient === 'portrait' ? 210 : 297) - m.l - m.r) * MM}px`;
+  stage.innerHTML = sanitize(r.html);
+  stage.querySelectorAll('td:empty, th:empty').forEach((c) => { c.innerHTML = '<br>'; });
+  try {
+    return await exportDocx(stage, { name, orient, m });
+  } finally {
+    stage.innerHTML = '';
   }
 }
 
@@ -491,7 +622,7 @@ function setMode(mode) {
   document.body.dataset.mode = mode;
   $('#modeBadge').textContent = mode === 'hwp' ? '한글 문서' : '워드 문서';
   try { localStorage.setItem(MODE_KEY, mode); } catch { /* 무시 */ }
-  if (mode === 'docx') layout();
+  if (mode === 'docx') { layout(); autoZoom(); }
 }
 
 function pickFile() {
@@ -531,17 +662,10 @@ async function openFile(file, filePath) {
       }
       if (html === null) {
         if (!zip.file('word/document.xml')) throw new Error('지원하지 않는 형식');
-        // 워드에서 만든 문서: 한글 프로그램이 있으면 변환해서 한글 엔진으로 연다 (색·크기·정렬·그림이 살아남)
-        if (desktop && await desktop.hasHancom()) {
-          toast('워드 문서를 여는 중… (한글 프로그램으로 변환합니다)');
-          const conv = await desktop.convertBytes({ data: new Uint8Array(buf), from: 'docx', to: 'hwp' }).catch(() => null);
-          if (conv && conv.ok) {
-            return await openHwp(new Uint8Array(conv.data), file.name, filePath, 'docx');
-          }
-        }
-        const mod = await import('mammoth/mammoth.browser.js');
-        const mammoth = mod.default || mod;
-        html = (await mammoth.convertToHtml({ arrayBuffer: buf })).value;
+        // 워드에서 만든 문서: 직접 해석해서 글자·문단 모양, 표, 그림, 용지 설정을 살린다
+        const { docxToDoc } = await import('./docx-import.js');
+        const r = await docxToDoc(zip);
+        html = r.html; pageSt = r;
       }
     } else throw new Error('지원하지 않는 형식');
     setMode('docx');
@@ -551,7 +675,7 @@ async function openFile(file, filePath) {
     $('#docName').value = file.name.replace(/\.(docx|hwpx?)$/i, '');
     savedRange = null;
     hist.stack = []; hist.i = -1;
-    applyPage(); flush();
+    applyPage(); flush(); autoZoom();
     workspace.scrollTop = 0;
     toast('문서를 열었습니다');
     return true;
@@ -587,10 +711,10 @@ const actions = {
   pagebreak() { insertBlock(`<div class="page-break" contenteditable="false"></div>${EMPTY}`); },
   rowAdd() { tableOp('rowAdd'); }, colAdd() { tableOp('colAdd'); },
   rowDel() { tableOp('rowDel'); }, colDel() { tableOp('colDel'); }, tblDel() { tableOp('tblDel'); },
-  zoomIn() { setZoom(doc.zoom + 0.1); },
-  zoomOut() { setZoom(doc.zoom - 0.1); },
-  zoom100() { setZoom(1); },
-  zoomFit() { fitZoom(); },
+  zoomIn() { userZoomed = true; setZoom(doc.zoom + 0.1); },
+  zoomOut() { userZoomed = true; setZoom(doc.zoom - 0.1); },
+  zoom100() { userZoomed = true; setZoom(1); },
+  zoomFit() { userZoomed = true; fitZoom(); },
   guides() {
     doc.guides = !doc.guides;
     guides.classList.toggle('off', !doc.guides);
@@ -680,6 +804,8 @@ function init() {
     toast, desktop, setMode, pickFile, newDocx,
     getName: docName,
     setBadge: (t) => { $('#modeBadge').textContent = t; },
+    hwpxToDocxBlob,
+    saveBytes,
     setName: (n) => { $('#docName').value = n; },
   });
 
@@ -689,7 +815,6 @@ function init() {
     const openFromDesktop = (f) => { if (f) { startedWithFile = true; openFile(new File([f.data], f.name), f.path); } };
     desktop.onOpenFile(openFromDesktop);
     desktop.initialFile().then((f) => { openFromDesktop(f); if (!f) startMode(); });
-    desktop.hasHancom().then((yes) => { $('#saveHwpBtn').hidden = !yes; });
   }
 
   // 처음 화면: 지난번에 쓰던 종류로, 없으면 한글 문서로 시작
@@ -730,7 +855,7 @@ function init() {
 
   $('#guideBtn').classList.add('active');
   applyPage();
-  if (workspace.clientWidth - 24 < page.offsetWidth) fitZoom();
+  autoZoom();
   record();
   new ResizeObserver(layout).observe(editor);
   addEventListener('resize', layout);
@@ -740,4 +865,4 @@ function init() {
 init();
 
 // 동작 확인용 (화면에는 영향 없음)
-window.__editor = { saveDocx, openFile };
+window.__editor = { saveDocx, saveHwp, openFile, hwpxToDocxBlob };
