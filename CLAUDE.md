@@ -11,6 +11,11 @@
   - 워드 화면 → 한글 저장: `src/engine.js`가 rhwp 엔진(`src/vendor/rhwp-core.js` + `public/studio/assets/rhwp_bg.wasm`)의 `pasteHtml`로 만든다. 목록은 번호를 글자로 바꿔 넣는다(엔진이 번호를 글머리표로 바꾸기 때문).
   - 한글 화면 → 워드 저장: rhwp `exportHwpx` → `src/hwpx-import.js` → `#exportStage`에 그려서 `docx-export.js`.
   - 한글 프로그램은 "한글에서 열어 보기" 단추에만 쓴다(없으면 숨김). 점검할 때 `HANGUL_EDITOR_NO_HANCOM=1`이면 없는 PC처럼 동작한다.
+- **줄 간격 약속**: 워드 "1줄"은 화면(CSS)에서 글자 크기의 1.3배(`WORD_LINE`). 불러올 때 곱하고 저장할 때 나눈다. 이 값을 바꾸면 워드 왕복 쪽 수가 달라진다.
+- **첨자**: 화면에서는 1/1.2 크기를 직접 적는다(`font-size:smaller`는 부모 기준이라 틀어짐). 워드·한글로 낼 때 1.2배로 되돌린다.
+- **머리글·바닥글**: 워드 화면에서는 보이지 않지만 `doc.parts`에 담아 두었다가 워드로 저장할 때 다시 넣는다(쪽 번호는 `span[data-field=page]`).
+- **이 편집기로 저장한 docx**에는 원본 HTML(`hangulEditor/content.xml`)과 `word/document.xml`의 지문(`docHash`)을 넣는다. 다른 프로그램에서 고쳐 지문이 다르면 원본 대신 워드 내용을 읽는다.
+- **한글 → 워드(hwpx-import)**: 문서에 저장된 줄 배치(lineseg)로 줄 높이를 정하고, 떠 있는 그림은 같은 기준·거리의 떠 있는 그림으로, 바탕쪽 그림은 머리글 안 "글 뒤" 그림으로, 글 없는 도형(배경 띠·점선 답 칸)은 덮는 문단의 음영·테두리로 옮긴다. WMF 그림은 `src/wmf.js`가 PNG로 그린다.
 
 ## 명령
 - 개발 서버: `npm run dev`
@@ -23,7 +28,9 @@
 - electron-builder의 winCodeSign 압축 풀기가 심볼릭 링크 권한으로 실패하면 `%LOCALAPPDATA%\electron-builder\Cache\winCodeSign\winCodeSign-2.6.0`에 직접 풀어 넣는다.
 
 ## rhwp 엔진을 고쳐서 다시 빌드하기
-- `public/studio/`의 엔진(`rhwp_bg-*.wasm`)은 v0.9.0 소스에 `patches/`의 수정을 넣어 이 PC에서 직접 빌드한 것이다. 수정 내용: 글이 있는 문단에 "글 뒤로" 그림이 붙으면 그 문단 높이가 0이 되어 다음 문단이 겹치던 문제(`src/renderer/layout/shape_item.inc.rs`).
+- `public/studio/`의 엔진(`rhwp_bg-*.wasm`)은 v0.9.0 소스에 `patches/`의 수정을 넣어 이 PC에서 직접 빌드한 것이다. 수정 내용:
+  - 글이 있는 문단에 "글 뒤로" 그림이 붙으면 그 문단 높이가 0이 되어 다음 문단이 겹치던 문제(`src/renderer/layout/shape_item.inc.rs`).
+  - HTML 붙여 넣기에서 `background-color`(형광펜 → 글자 음영), `vertical-align`(위·아래 첨자), `page-break-before:always`(문단 앞 쪽 나눔)를 읽게 함(`html_import/inline_content.rs`, `html_import.rs`).
 - 이 PC에는 C 컴파일러(MSVC/MinGW)가 없어 네이티브 Rust 실행 파일은 못 만든다. 그래서 다음 우회로를 쓴다.
   - Rust 1.93.1 `x86_64-pc-windows-gnu` + `wasm32-unknown-unknown`, `wasm32-wasip1` 타깃.
   - 툴체인의 `llvm-ar.exe`를 `llvm-dlltool.exe`로 복사하고 `-C dlltool=`로 지정(빌드 스크립트 링크용).

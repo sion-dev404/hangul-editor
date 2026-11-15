@@ -1,0 +1,87 @@
+diff --git a/src/document_core/commands/html_import.rs b/src/document_core/commands/html_import.rs
+index 1c61b2b5..4dc77df5 100644
+--- a/src/document_core/commands/html_import.rs
++++ b/src/document_core/commands/html_import.rs
+@@ -849,6 +849,14 @@ impl DocumentCore {
+                     let mut para = Paragraph::default();
+                     para.para_shape_id = para_shape_id;
+                     self.parse_inline_content(&mut para, p_inner, &para_style);
++                    // CSS ? ???(page-break-before / break-before) ? ? ?? ??? ? ??
++                    let style_lc = para_style.to_lowercase().replace(' ', "");
++                    if style_lc.contains("page-break-before:always")
++                        || style_lc.contains("break-before:page")
++                    {
++                        para.column_type = crate::model::paragraph::ColumnBreakType::Page;
++                        para.raw_break_type = 0x04;
++                    }
+                     paragraphs.push(para);
+ 
+                     pos = p_end;
+diff --git a/src/document_core/commands/html_import/inline_content.rs b/src/document_core/commands/html_import/inline_content.rs
+index c772098c..92dbf8b5 100644
+--- a/src/document_core/commands/html_import/inline_content.rs
++++ b/src/document_core/commands/html_import/inline_content.rs
+@@ -276,6 +276,35 @@ impl DocumentCore {
+             }
+         }
+ 
++        // background-color ? ?? ??(???). ?????? ?? ???? ??.
++        // (?? rgba(?,0) ? ??? ??? ?? ??? ??? ??? ?? ??)
++        let bg = parse_css_value(&css_lower, "background-color")
++            .or_else(|| parse_css_value(&css_lower, "background"));
++        cs.shade_color = crate::model::color::NONE;
++        if let Some(bg) = bg {
++            let v = bg.trim().to_string();
++            let transparent = v == "transparent"
++                || v == "none"
++                || (v.starts_with("rgba")
++                    && v.trim_end_matches(')')
++                        .rsplit(',')
++                        .next()
++                        .and_then(|a| a.trim().parse::<f64>().ok())
++                        .is_some_and(|a| a == 0.0));
++            if !transparent {
++                if let Some(bgr) = css_color_to_hwp_bgr(&v) {
++                    if bgr != 0x00FF_FFFF {
++                        cs.shade_color = bgr;
++                    }
++                }
++            }
++        }
++
++        // vertical-align ? ????????
++        let va = parse_css_value(&css_lower, "vertical-align").unwrap_or_default();
++        cs.superscript = va.trim().starts_with("super");
++        cs.subscript = va.trim().starts_with("sub");
++
+         // text-decoration
+         let has_underline = css_lower.contains("text-decoration:underline")
+             || css_lower.contains("text-decoration: underline")
+diff --git a/src/document_core/html_table_import.rs b/src/document_core/html_table_import.rs
+index 5987eff1..cad1e111 100644
+--- a/src/document_core/html_table_import.rs
++++ b/src/document_core/html_table_import.rs
+@@ -519,7 +519,7 @@ impl DocumentCore {
+             let mut raw_list_extra = vec![0u8; 13];
+             raw_list_extra[0..4].copy_from_slice(&cell_width.to_le_bytes());
+ 
+-            cells.push(Cell {
++            let mut cell = Cell {
+                 col: cp.col,
+                 row: cp.row,
+                 col_span: cp.col_span,
+@@ -534,7 +534,13 @@ impl DocumentCore {
+                 vertical_align: v_align,
+                 raw_list_extra,
+                 ..Default::default()
+-            });
++            };
++            // CSS padding ? ? ?? "? ??? ? ?? ??"? ??.
++            // ? ?? ??? ? padding ? ???? ? ?? ??? ?? ? ???? ??? ????.
++            if pc.padding_pt.iter().any(|v| *v > 0.01) {
++                cell.set_apply_inner_margin(true);
++            }
++            cells.push(cell);
+         }
+ 
+         // ? ?? ?? ??? ?? ?/? ?? ??? ??? ?? ?? ? ???

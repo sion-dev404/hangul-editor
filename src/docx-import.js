@@ -8,6 +8,9 @@ const TWIP_PT = 1 / 20;
 const EMU_PX = 1 / 9525;
 const MAX_IMG_W = 600;
 const MIME = { png: 'png', jpg: 'jpeg', jpeg: 'jpeg', gif: 'gif', bmp: 'bmp' };
+// 워드의 "1줄"(글꼴 고유 줄 높이)은 화면(CSS)에서 글자 크기의 약 1.3배다.
+// 불러올 때 곱하고 저장할 때 나누므로 왕복해도 값이 그대로 남는다.
+export const WORD_LINE = 1.3;
 const HIGHLIGHT = {
   yellow: '#ffff00', green: '#00ff00', cyan: '#00ffff', magenta: '#ff00ff', blue: '#0000ff', red: '#ff0000',
   darkBlue: '#000080', darkCyan: '#008080', darkGreen: '#008000', darkMagenta: '#800080', darkRed: '#800000',
@@ -78,8 +81,12 @@ function runCss(p) {
   const deco = [p.u && 'underline', p.strike && 'line-through'].filter(Boolean).join(' ');
   if (deco) css.push(`text-decoration:${deco}`);
   if (p.bg) css.push(`background-color:${p.bg}`);
-  if (p.vert === 'superscript') css.push('vertical-align:super', 'font-size:smaller');
-  if (p.vert === 'subscript') css.push('vertical-align:sub', 'font-size:smaller');
+  // 첨자는 화면에서 1/1.2 크기로 그린다 ('smaller'는 부모 기준이라 크기가 틀어지므로 값을 직접 적는다).
+  // 저장할 때 1.2배로 되돌린다.
+  if (p.vert === 'superscript' || p.vert === 'subscript') {
+    css.push(`vertical-align:${p.vert === 'superscript' ? 'super' : 'sub'}`);
+    css.push(`font-size:${Math.round(((p.size || 10) / 1.2) * 100) / 100}pt`);
+  }
   if (p.caps) css.push('text-transform:uppercase');
   return css.join(';');
 }
@@ -96,7 +103,7 @@ function readPPr(pPr) {
   const sp = kid(pPr, 'spacing');
   if (sp) {
     const line = attr(sp, 'line'); const rule = attr(sp, 'lineRule') || 'auto';
-    if (line && +line > 0) o.line = rule === 'auto' ? { ratio: +line / 240 } : { pt: +line * TWIP_PT };
+    if (line && +line > 0) o.line = rule === 'auto' ? { ratio: +line / 240 } : { pt: +line * TWIP_PT, rule };
     if (attr(sp, 'before') !== null && attr(sp, 'beforeAutospacing') !== '1') o.before = +attr(sp, 'before') * TWIP_PT;
     if (attr(sp, 'after') !== null && attr(sp, 'afterAutospacing') !== '1') o.after = +attr(sp, 'after') * TWIP_PT;
   }
@@ -119,10 +126,11 @@ function readPPr(pPr) {
 function paraCss(p) {
   const css = [];
   if (p.align && p.align !== 'left') css.push(`text-align:${p.align}`);
-  if (p.line?.ratio) css.push(`line-height:${Math.round(p.line.ratio * 100) / 100}`);
-  if (p.line?.pt) css.push(`line-height:${Math.round(p.line.pt * 10) / 10}pt`);
-  if (p.before) css.push(`margin-top:${Math.round(p.before * 10) / 10}pt`);
-  if (p.after) css.push(`margin-bottom:${Math.round(p.after * 10) / 10}pt`);
+  // 줄 간격이 없으면 워드 기본값(1줄)이다. 편집 화면 기본값(1.6)이 끼어들지 않게 늘 적는다.
+  if (p.line?.pt) css.push(`line-height:${Math.round(p.line.pt * 100) / 100}pt`);
+  else css.push(`line-height:${Math.round((p.line?.ratio || 1) * WORD_LINE * 10000) / 10000}`);
+  css.push(`margin-top:${Math.round((p.before || 0) * 100) / 100}pt`);
+  css.push(`margin-bottom:${Math.round((p.after || 0) * 100) / 100}pt`);
   if (p.left) css.push(`margin-left:${Math.round(p.left * 10) / 10}pt`);
   if (p.right) css.push(`margin-right:${Math.round(p.right * 10) / 10}pt`);
   if (p.first) css.push(`text-indent:${Math.round(p.first * 10) / 10}pt`);
@@ -242,6 +250,9 @@ export async function docxToDoc(zip) {
   }
 
   // 문단 안의 글자들을 target에 넣는다. 글상자 안 문단은 after에 모은다.
+  // 쪽 번호 필드 자리
+  const pageField = (css) => { const s = el('span', css); s.dataset.field = 'page'; s.textContent = '1'; return s; };
+
   async function inlines(node, target, rBase, after, state) {
     for (const c of node.children) {
       const n = c.localName;
@@ -253,12 +264,22 @@ export async function docxToDoc(zip) {
         const css = runCss(p);
         let span = null;
         const text = (t) => {
-          if (!t) return;
+          if (!t || state.skipField) return;
           if (!span) { span = el('span', css); target.append(span); }
           span.append(t);
         };
         for (const x of c.children) {
           const k = x.localName;
+          // 필드(쪽 번호 등): 시작 → 명령 → 구분 → 결과 → 끝
+          if (k === 'fldChar') {
+            const t = attr(x, 'fldCharType');
+            if (t === 'begin') state.field = '';
+            else if (t === 'separate') {
+              if (/^\s*PAGE\b/i.test(state.field || '')) { target.append(pageField(css)); span = null; state.skipField = true; }
+            } else if (t === 'end') { state.field = null; state.skipField = false; }
+            continue;
+          }
+          if (k === 'instrText') { if (state.field !== null && state.field !== undefined) state.field += x.textContent; continue; }
           if (k === 't') text(x.textContent);
           else if (k === 'tab' || k === 'ptab') text('\u00a0\u00a0\u00a0\u00a0');
           else if (k === 'noBreakHyphen') text('-');
@@ -269,8 +290,11 @@ export async function docxToDoc(zip) {
           } else if (k === 'drawing' || k === 'pict' || k === 'object' || k === 'AlternateContent') {
             span = null;
             await drawing(x, target, after);
-          } else if (k === 'fldChar' || k === 'instrText' || k === 'rPr') { /* 필드 명령은 건너뛴다 */ }
+          } else if (k === 'rPr') { /* 글자 모양은 위에서 읽었다 */ }
         }
+      } else if (n === 'fldSimple' && /^\s*PAGE\b/i.test(attr(c, 'instr') || '')) {
+        const rPr = kid(deep(c, 'r')[0], 'rPr');
+        target.append(pageField(runCss(Object.assign({}, rBase, readRPr(rPr, theme)))));
       } else if (n === 'hyperlink' || n === 'ins' || n === 'smartTag' || n === 'fldSimple' || n === 'customXml' || n === 'dir' || n === 'bdo') {
         await inlines(c, target, rBase, after, state);
       } else if (n === 'sdt') {
@@ -314,14 +338,20 @@ export async function docxToDoc(zip) {
   async function paragraph(p, parent) {
     const info = paraProps(p);
     const node = el(info.list ? 'li' : info.tag, paraCss(info.props));
+    if (info.props.line?.rule === 'atLeast') node.dataset.lr = 'atLeast';
     const after = out.createDocumentFragment();
-    const state = { pageBreakAfter: false };
+    const state = { pageBreakAfter: false, field: null, skipField: false };
     await inlines(p, node, info.rBase, after, state);
+    const empty = !node.textContent.trim() && !node.querySelector('img');
+    // 쪽 나누기만 든 빈 문단은 쪽 나누기 하나로 바꾼다 (다시 저장해도 문단이 늘지 않게)
+    const breakOnly = state.pageBreakAfter && empty && !node.querySelector('br');
     if (!node.childNodes.length) node.append(out.createElement('br'));
-    // 빈 문단에도 글자 크기를 남겨 줄 높이가 원본과 같게 한다
-    else if (!node.textContent.trim() && !node.querySelector('img') && info.rBase.size) node.style.fontSize = `${info.rBase.size}pt`;
-    if (!node.querySelector('span') && info.rBase.size && node.textContent.trim()) node.style.fontSize = `${info.rBase.size}pt`;
-    return { node, list: info.list, pageBefore: info.props.pageBreak, pageAfter: state.pageBreakAfter, after };
+    // 빈 문단은 문단 기호의 글자 크기를 써서 줄 높이가 원본과 같게 한다
+    const mark = Object.assign({}, info.rBase, readRPr(kid(kid(p, 'pPr'), 'rPr'), theme));
+    const size = empty ? mark.size : info.rBase.size;
+    if (size && (empty || !node.querySelector('span'))) node.style.fontSize = `${size}pt`;
+    if (empty && mark.font) node.style.fontFamily = `'${mark.font.replace(/['"\\;<>]/g, '')}'`;
+    return { node, list: info.list, pageBefore: info.props.pageBreak, pageAfter: state.pageBreakAfter, breakOnly, after };
   }
 
   function pageBreak() {
@@ -378,6 +408,12 @@ export async function docxToDoc(zip) {
       if (n === 'p') {
         const r = await paragraph(c, parent);
         if (r.pageBefore) { closeLists(); parent.append(pageBreak()); }
+        if (r.breakOnly && !r.list) {
+          closeLists();
+          if (r.after.childNodes.length) parent.append(r.after);
+          parent.append(pageBreak());
+          continue;
+        }
         if (r.list) {
           while (stack.length && (stack[stack.length - 1].lvl > r.list.lvl
             || (stack[stack.length - 1].lvl === r.list.lvl && stack[stack.length - 1].tag !== r.list.tag))) stack.pop();
@@ -420,10 +456,35 @@ export async function docxToDoc(zip) {
   const sect = kids(bodyEl, 'sectPr').pop() || deep(bodyEl, 'sectPr').pop();
   if (sect) {
     const sz = kid(sect, 'pgSz'); const mar = kid(sect, 'pgMar');
-    const mm = (v) => Math.min(80, Math.max(5, Math.round(((+v || 0) / 1440) * 25.4)));
+    const mm = (v) => Math.min(80, Math.max(5, Math.round(((+v || 0) / 1440) * 25.4 * 100) / 100));
     const landscape = attr(sz, 'orient') === 'landscape' || (+attr(sz, 'w') > +attr(sz, 'h'));
-    if (mar) page = { orient: landscape ? 'landscape' : 'portrait', m: { t: mm(attr(mar, 'top')), b: mm(attr(mar, 'bottom')), l: mm(attr(mar, 'left')), r: mm(attr(mar, 'right')) } };
-    else page = { orient: landscape ? 'landscape' : 'portrait' };
+    if (mar) {
+      page = { orient: landscape ? 'landscape' : 'portrait', m: { t: mm(attr(mar, 'top')), b: mm(attr(mar, 'bottom')), l: mm(attr(mar, 'left')), r: mm(attr(mar, 'right')) } };
+      const d = (v) => Math.round(((+v || 0) / 1440) * 25.4 * 100) / 100;
+      if (attr(mar, 'header') !== null) page.hf = { header: d(attr(mar, 'header')), footer: d(attr(mar, 'footer')) };
+    } else page = { orient: landscape ? 'landscape' : 'portrait' };
   }
-  return { html: root.innerHTML, ...page };
+
+  // 머리글·바닥글 (기본 쪽 것). 편집 화면에는 안 보이지만 다시 저장할 때 그대로 넣는다.
+  async function part(kind) {
+    const refs = sect ? kids(sect, `${kind}Reference`) : [];
+    const ref = refs.find((r) => attr(r, 'type') === 'default') || refs[0];
+    const rid = ref && (ref.getAttributeNS(R_NS, 'id') || ref.getAttribute('r:id'));
+    const target = rid && rels[rid];
+    if (!target) return '';
+    const path = target.startsWith('/') ? target.slice(1) : `word/${target}`;
+    const px = await parse(path);
+    if (!px) return '';
+    // 머리글 안 그림은 머리글 자신의 연결 정보로 찾는다
+    const own = await parse(path.replace(/([^/]+)$/, '_rels/$1.rels'));
+    const saved = { ...rels };
+    if (own) for (const r of deep(own, 'Relationship')) rels[r.getAttribute('Id')] = r.getAttribute('Target');
+    const box = out.createElement('div');
+    await blocks(px.documentElement, box);
+    Object.keys(rels).forEach((k) => delete rels[k]); Object.assign(rels, saved);
+    return box.textContent.trim() || box.querySelector('img') ? box.innerHTML : '';
+  }
+  const header = await part('header');
+  const footer = await part('footer');
+  return { html: root.innerHTML, ...page, ...(header || footer ? { parts: { header, footer } } : {}) };
 }

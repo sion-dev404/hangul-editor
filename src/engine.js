@@ -24,6 +24,16 @@ function engine() {
 const HU_PER_MM = 7200 / 25.4;
 const PAGE_BREAK = /<div[^>]*class="page-break"[^>]*>\s*<\/div>/gi;
 
+// 쪽 나누기 표시(div) → 바로 뒤 문단의 page-break-before. 뒤가 문단이 아니면(표 등) 빈 문단을 하나 둔다.
+export function pageBreaksToCss(html) {
+  return html.replace(new RegExp(`${PAGE_BREAK.source}\\s*(<p\\b[^>]*>)?`, 'gi'), (_m, p) => {
+    if (!p) return '<p style="page-break-before:always"><br></p>';
+    return /style="/i.test(p)
+      ? p.replace(/style="/i, 'style="page-break-before:always;')
+      : p.replace(/^<p/i, '<p style="page-break-before:always"');
+  });
+}
+
 // 편집 화면의 HTML을 한글 문서(.hwp/.hwpx) 바이트로 만든다
 // page: { orient: 'portrait'|'landscape', m: { t, b, l, r } (mm) }
 export async function htmlToHwp(html, page, fmt = 'hwp') {
@@ -42,20 +52,11 @@ export async function htmlToHwp(html, page, fmt = 'hwp') {
       }
       d.setPageDef(0, JSON.stringify(def));
     }
-    // 쪽 나누기는 붙여 넣기가 받지 않으므로 나눠서 넣고 사이에 쪽 나누기를 넣는다
-    const parts = html.split(PAGE_BREAK);
-    let pos = { paraIdx: 0, charOffset: 0 };
-    parts.forEach((part, i) => {
-      if (i) {
-        const r = JSON.parse(d.insertPageBreak(0, pos.paraIdx, pos.charOffset));
-        pos = { paraIdx: r.paraIdx ?? pos.paraIdx + 1, charOffset: r.charOffset ?? 0 };
-      }
-      if (part.trim()) {
-        const r = JSON.parse(d.pasteHtml(0, pos.paraIdx, pos.charOffset, part));
-        if (r.ok === false) throw new Error(r.error || '붙여 넣기 실패');
-        pos = { paraIdx: r.paraIdx, charOffset: r.charOffset };
-      }
-    });
+    // 쪽 나누기는 다음 문단의 "page-break-before"로 바꿔 한 번에 붙여 넣는다.
+    // (나눠서 넣고 사이에 쪽 나누기를 끼우면, 그림으로 끝나는 문단에서 커서가 그림 앞에 놓여
+    //  그림이 다음 쪽으로 밀리고 뒤 글이 그림 앞에 붙는 문제가 있었다)
+    const r = JSON.parse(d.pasteHtml(0, 0, 0, pageBreaksToCss(html)));
+    if (r.ok === false) throw new Error(r.error || '붙여 넣기 실패');
     return fmt === 'hwpx' ? d.exportHwpx() : d.exportHwp();
   } finally {
     try { d.free(); } catch { /* 무시 */ }

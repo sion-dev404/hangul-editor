@@ -20,10 +20,16 @@ const MARGINS = {
 const desktop = window.desktop || null; // 설치형(.exe)에서만 있음
 
 function pageState() {
-  return { orient: doc.orient, margin: doc.margin, m: MARGINS[doc.margin] };
+  return { orient: doc.orient, margin: doc.margin, m: MARGINS[doc.margin], parts: doc.parts, hf: doc.hf };
 }
 function applyPageState(s) {
+  doc.parts = null; doc.hf = null;
   if (!s) return;
+  // 머리글·바닥글(편집 화면에는 없지만 저장할 때 그대로 다시 넣는다)
+  if (s.parts && (s.parts.header || s.parts.footer)) {
+    doc.parts = { header: sanitize(String(s.parts.header || '')), footer: sanitize(String(s.parts.footer || '')) };
+  }
+  if (s.hf && Number.isFinite(+s.hf.header) && Number.isFinite(+s.hf.footer)) doc.hf = { header: +s.hf.header, footer: +s.hf.footer };
   if (s.orient === 'portrait' || s.orient === 'landscape') doc.orient = s.orient;
   const ok = s.m && ['t', 'b', 'l', 'r'].every((k) => Number.isFinite(+s.m[k]) && +s.m[k] >= 0 && +s.m[k] <= 100);
   if (s.margin === 'custom' || (!s.margin && ok)) {
@@ -38,7 +44,7 @@ const STORE = 'hangul-editor-doc';
 const OWN_PART = 'hangulEditor/content.xml';
 const EMPTY = '<p><br></p>';
 
-const doc = { orient: 'portrait', margin: 'normal', zoom: 1, guides: true };
+const doc = { orient: 'portrait', margin: 'normal', zoom: 1, guides: true, parts: null, hf: null };
 let savedRange = null;
 let pendingPt = 10;
 
@@ -440,14 +446,42 @@ function docName() {
   return ($('#docName').value.trim() || '새 문서').replace(/[\\/:*?"<>|]/g, '_');
 }
 
+// 짧은 지문(FNV-1a): 저장해 둔 원본이 지금 워드 내용과 같은지 확인할 때 쓴다
+function hashText(s) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+  return `${s.length.toString(16)}-${h.toString(16)}`;
+}
+
+// 머리글·바닥글을 화면 밖 무대에 그려 워드 저장에 넘긴다
+function stageParts(parts, widthPx) {
+  const stage = $('#exportStage');
+  const make = (html) => {
+    if (!html) return null;
+    const d = document.createElement('div');
+    d.style.width = `${widthPx}px`;
+    d.innerHTML = html;
+    d.querySelectorAll('td:empty, th:empty').forEach((c) => { c.innerHTML = '<br>'; });
+    stage.append(d);
+    return d;
+  };
+  const header = make(parts?.header); const footer = make(parts?.footer);
+  return { header, footer, done: () => { header?.remove(); footer?.remove(); } };
+}
+
 async function buildDocx() {
   flush();
   const name = docName();
   const [{ exportDocx }, { default: JSZip }] = await Promise.all([import('./docx-export.js'), import('jszip')]);
-  const blob = await exportDocx(editor, { name, orient: doc.orient, m: MARGINS[doc.margin] });
+  const parts = stageParts(doc.parts, editor.clientWidth);
+  let blob;
+  try {
+    blob = await exportDocx(editor, { name, orient: doc.orient, m: MARGINS[doc.margin], header: parts.header, footer: parts.footer, hf: doc.hf });
+  } finally { parts.done(); }
   // 이 편집기에서 다시 열 때 모양이 그대로 살아나도록 원본을 함께 넣어 둔다
   const zip = await JSZip.loadAsync(blob);
-  const payload = b64encode(JSON.stringify({ html: editor.innerHTML, ...pageState() }));
+  const docHash = hashText(await zip.file('word/document.xml').async('string'));
+  const payload = b64encode(JSON.stringify({ html: editor.innerHTML, ...pageState(), docHash }));
   zip.file(OWN_PART, `<?xml version="1.0" encoding="UTF-8"?><hangulEditor xmlns="urn:hangul-editor" version="1">${payload}</hangulEditor>`);
   return zip.generateAsync({
     type: 'blob', compression: 'DEFLATE',
@@ -495,9 +529,11 @@ function explicitHtml(root) {
   const out = document.createElement('div');
   const textCss = (el) => {
     const cs = getComputedStyle(el);
+    // 첨자는 한글이 스스로 줄여 그리므로 화면에서 줄인 크기(1/1.2)를 되돌려 적는다
+    const script = cs.verticalAlign === 'super' || cs.verticalAlign === 'sub';
     const css = [
       `font-family:'${cs.fontFamily.split(',')[0].trim().replace(/^["']|["']$/g, '')}'`,
-      `font-size:${px2pt(cs.fontSize)}pt`,
+      `font-size:${px2pt(parseFloat(cs.fontSize) * (script ? 1.2 : 1))}pt`,
     ];
     const color = cssColor(cs.color); if (color) css.push(`color:${color}`);
     if (parseInt(cs.fontWeight, 10) >= 600) css.push('font-weight:bold');
@@ -520,12 +556,31 @@ function explicitHtml(root) {
     const cs = getComputedStyle(el);
     const css = [`text-align:${cs.textAlign === 'start' ? 'left' : cs.textAlign}`];
     const lh = parseFloat(cs.lineHeight); const fs = parseFloat(cs.fontSize);
-    if (Number.isFinite(lh) && fs) css.push(`line-height:${Math.round((lh / fs) * 100)}%`);
+    // 'normal'(워드의 1줄)은 글자 크기의 약 1.3배이다
+    if (fs) css.push(`line-height:${Math.round((Number.isFinite(lh) ? lh / fs : 1.3) * 100)}%`);
     for (const [k, v] of [['margin-left', cs.marginLeft], ['text-indent', cs.textIndent], ['margin-top', cs.marginTop], ['margin-bottom', cs.marginBottom]]) {
       if (parseFloat(v)) css.push(`${k}:${px2pt(v)}pt`);
     }
     const bg = cssColor(cs.backgroundColor);
     if (bg && bg !== '#ffffff') css.push(`background-color:${bg}`);
+    if (el.tagName === 'TD' || el.tagName === 'TH') {
+      // 표 칸: 한글 엔진은 칸 style의 너비·안쪽 여백·테두리·세로 정렬을 읽는다 (없으면 테두리가 사라지고 가운데 정렬이 된다)
+      const z = doc.zoom || 1;
+      css.push(`width:${px2pt(el.getBoundingClientRect().width / z)}pt`);
+      // 한글은 칸의 첫 문단 위 간격·마지막 문단 아래 간격을 칸 높이에 넣지 않으므로 칸 안쪽 여백으로 옮긴다
+      const blocks = [...el.children].filter((c) => BLOCK_TAGS.has(c.tagName) || /^H[1-6]$/.test(c.tagName));
+      const extraTop = blocks.length ? parseFloat(getComputedStyle(blocks[0]).marginTop) || 0 : 0;
+      const extraBottom = blocks.length ? parseFloat(getComputedStyle(blocks[blocks.length - 1]).marginBottom) || 0 : 0;
+      const pad = [parseFloat(cs.paddingTop) + extraTop, parseFloat(cs.paddingRight), parseFloat(cs.paddingBottom) + extraBottom, parseFloat(cs.paddingLeft)];
+      css.push(`padding:${pad.map((v) => `${px2pt(v)}pt`).join(' ')}`);
+      for (const side of ['Top', 'Right', 'Bottom', 'Left']) {
+        const st = cs[`border${side}Style`]; const w = parseFloat(cs[`border${side}Width`]) || 0;
+        css.push(st === 'none' || st === 'hidden' || !w
+          ? `border-${side.toLowerCase()}:none`
+          : `border-${side.toLowerCase()}:${px2pt(w)}pt ${st} ${cssColor(cs[`border${side}Color`]) || '#000000'}`);
+      }
+      css.push(`vertical-align:${cs.verticalAlign === 'middle' ? 'middle' : cs.verticalAlign === 'bottom' ? 'bottom' : 'top'}`);
+    }
     return css.join(';');
   };
   // 목록은 한글 엔진이 번호를 글머리표로 바꾸므로, 번호·글머리를 글자로 적은 문단으로 바꿔 넣는다
@@ -539,7 +594,10 @@ function explicitHtml(root) {
       const indent = (li.getBoundingClientRect().left - rootLeft) / (doc.zoom || 1);
       p.setAttribute('style', `${blockCss(li).replace(/margin-left:[^;]*;?/, '')};margin-left:${px2pt(indent)}pt`);
       const mark = document.createElement('span');
-      mark.setAttribute('style', textCss(li));
+      // 번호·글머리 기호는 항목 첫 글자와 같은 모양으로 (형광펜은 빼고)
+      const tw = document.createTreeWalker(li, NodeFilter.SHOW_TEXT, { acceptNode: (t) => (t.data.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP) });
+      const first = tw.nextNode();
+      mark.setAttribute('style', textCss(first ? first.parentElement : li).replace(/;?background-color:[^;]*/g, '').replace(/;?text-decoration:[^;]*/g, ''));
       mark.textContent = ul.tagName === 'OL' ? `${no}. ` : '• ';
       p.append(mark);
       const nested = [...li.children].filter((c) => c.tagName === 'UL' || c.tagName === 'OL');
@@ -561,7 +619,8 @@ function explicitHtml(root) {
       }
       if (n.nodeType !== 1) continue;
       if (INLINE_TAGS.has(n.tagName)) { walk(n, target); continue; }
-      const c = n.cloneNode(false);
+      // 제목(h1~h3)은 모양을 이미 글자마다 적었으므로 보통 문단으로 넘긴다 (쪽 나누기 처리도 같게)
+      const c = /^H[1-6]$/.test(n.tagName) ? document.createElement('p') : n.cloneNode(false);
       if (BLOCK_TAGS.has(n.tagName) && !n.classList.contains('page-break')) c.setAttribute('style', blockCss(n));
       target.append(c);
       walk(n, c);
@@ -607,13 +666,17 @@ async function hwpxToDocxBlob(hwpxBytes, name) {
   const orient = r.orient === 'landscape' ? 'landscape' : 'portrait';
   const m = r.m || MARGINS.normal;
   const stage = $('#exportStage');
-  stage.style.width = `${((orient === 'portrait' ? 210 : 297) - m.l - m.r) * MM}px`;
-  stage.innerHTML = sanitize(r.html);
-  stage.querySelectorAll('td:empty, th:empty').forEach((c) => { c.innerHTML = '<br>'; });
+  const width = ((orient === 'portrait' ? 210 : 297) - m.l - m.r) * MM;
+  stage.style.width = `${width}px`;
+  const body = document.createElement('div');
+  body.innerHTML = sanitize(r.html);
+  body.querySelectorAll('td:empty, th:empty').forEach((c) => { c.innerHTML = '<br>'; });
+  stage.replaceChildren(body);
+  const parts = stageParts(r.parts && { header: sanitize(r.parts.header || ''), footer: sanitize(r.parts.footer || '') }, width);
   try {
-    return await exportDocx(stage, { name, orient, m });
+    return await exportDocx(body, { name, orient, m, header: parts.header, footer: parts.footer, hf: r.hf });
   } finally {
-    stage.innerHTML = '';
+    stage.replaceChildren();
   }
 }
 
@@ -634,7 +697,7 @@ function newDocx() {
   setMode('docx');
   if (editor.innerText.trim() && !confirm('지금 워드 문서를 지우고 새 문서를 만들까요?')) return;
   setContent(''); $('#docName').value = '새 문서'; savedRange = null;
-  doc.orient = 'portrait'; doc.margin = 'normal';
+  doc.orient = 'portrait'; doc.margin = 'normal'; doc.parts = null; doc.hf = null;
   applyPage(); flush();
 }
 
@@ -658,7 +721,12 @@ async function openFile(file, filePath) {
       }
       if (own) {
         const m = />([A-Za-z0-9+/=]+)<\/hangulEditor>/.exec(await own.async('string'));
-        if (m) { const data = JSON.parse(b64decode(m[1])); html = data.html; pageSt = data; }
+        if (m) {
+          const data = JSON.parse(b64decode(m[1]));
+          // 이 편집기로 저장한 뒤 워드에서 고쳤다면 넣어 둔 원본은 낡았으므로 워드 내용을 읽는다
+          const body = await zip.file('word/document.xml')?.async('string');
+          if (!data.docHash || data.docHash === hashText(body || '')) { html = data.html; pageSt = data; }
+        }
       }
       if (html === null) {
         if (!zip.file('word/document.xml')) throw new Error('지원하지 않는 형식');
@@ -865,4 +933,4 @@ function init() {
 init();
 
 // 동작 확인용 (화면에는 영향 없음)
-window.__editor = { saveDocx, saveHwp, openFile, hwpxToDocxBlob };
+window.__editor = { saveDocx, saveHwp, openFile, hwpxToDocxBlob, explicitHtml: () => explicitHtml(editor) };

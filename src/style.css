@@ -194,3 +194,5 @@ body[data-mode="docx"] #hwpUi, body[data-mode="docx"] #studioHost { display: non
 
 /* 한글 → 워드 저장 때 화면 밖에서 문서를 그려 모양을 읽는 곳 */
 #exportStage { position: fixed; left: -30000px; top: 0; visibility: hidden; pointer-events: none; }
+/* 떠 있는 그림은 워드에서 따로 띄우므로 무대(표 너비 재기)에서는 글 흐름을 밀지 않게 한다 */
+#exportStage img[data-float] { position: absolute; }
