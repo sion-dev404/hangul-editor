@@ -11,12 +11,6 @@ let creating = null;
 let ctx = null; // { toast, desktop, setMode, getName, setName }
 const cur = { name: '새 문서', dir: null, format: 'hwp' };
 
-const svg = (d) => `<svg viewBox="0 0 16 16"><path d="${d}" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>`;
-const AL = svg('M1 3h14M1 6.5h9M1 10h14M1 13.5h9');
-const AC = svg('M1 3h14M4 6.5h8M1 10h14M4 13.5h8');
-const AR = svg('M1 3h14M6 6.5h9M1 10h14M6 13.5h9');
-const AJ = svg('M1 3h14M1 6.5h14M1 10h14M1 13.5h14');
-
 // c: rhwp 명령, a: 이 프로그램의 동작, i: 큰 단추 그림, sq: 네모 단추, t: 풍선 도움말
 const RIBBON = [
   { id: 'file', label: '파일', groups: [
@@ -39,25 +33,21 @@ const RIBBON = [
       [{ c: 'edit:cut', l: '오려 두기' }, { c: 'edit:copy', l: '복사' }],
       [{ c: 'edit:format-copy', l: '모양 복사' }, { c: 'edit:format-paste', l: '모양 붙이기' }],
     ] },
-    { label: '편집', rows: [
-      [{ c: 'edit:undo', l: '↶ 되돌리기' }, { c: 'edit:redo', l: '↷ 다시 실행' }],
-      [{ c: 'edit:select-all', l: '모두 선택' }, { c: 'edit:delete', l: '지우기' }],
-    ] },
+    // 굵게·기울임·밑줄·정렬은 아래 서식 줄에 이미 있으므로 리본에서는 뺐다 (겹치는 단추 제거)
     { label: '글자 모양', rows: [
-      [{ c: 'format:bold', sq: '<b>가</b>', t: '진하게' }, { c: 'format:italic', sq: '<em>가</em>', t: '기울임' },
-        { c: 'format:underline', sq: '<u>가</u>', t: '밑줄' }, { c: 'format:strikethrough', sq: '<s>가</s>', t: '취소선' },
-        { c: 'format:superscript', sq: '가<sup>2</sup>', t: '위 첨자' }, { c: 'format:subscript', sq: '가<sub>2</sub>', t: '아래 첨자' }],
-      [{ c: 'format:font-size-increase', l: '가 크게' }, { c: 'format:font-size-decrease', l: '가 작게' }, { c: 'format:char-shape', l: '글자 모양…' }],
+      [{ c: 'format:superscript', sq: '가<sup>2</sup>', t: '위 첨자' }, { c: 'format:subscript', sq: '가<sub>2</sub>', t: '아래 첨자' },
+        { c: 'format:font-size-increase', l: '가 크게' }, { c: 'format:font-size-decrease', l: '가 작게' }],
+      [{ c: 'format:char-shape', l: '글자 모양…' }],
     ] },
     { label: '문단 모양', rows: [
-      [{ c: 'format:align-left', sq: AL, t: '왼쪽 정렬' }, { c: 'format:align-center', sq: AC, t: '가운데 정렬' },
-        { c: 'format:align-right', sq: AR, t: '오른쪽 정렬' }, { c: 'format:align-justify', sq: AJ, t: '양쪽 정렬' },
-        { c: 'format:line-spacing-decrease', l: '줄 간격 좁게' }, { c: 'format:line-spacing-increase', l: '줄 간격 넓게' }],
       [{ c: 'format:toggle-bullet', l: '● 글머리표' }, { c: 'format:toggle-numbering', l: '1. 번호' },
-        { c: 'format:level-decrease', l: '⇤ 내어쓰기' }, { c: 'format:level-increase', l: '⇥ 들여쓰기' }, { c: 'format:para-shape', l: '문단 모양…' }],
+        { c: 'format:level-decrease', l: '⇤ 내어쓰기' }, { c: 'format:level-increase', l: '⇥ 들여쓰기' }],
+      [{ c: 'format:line-spacing-decrease', l: '줄 간격 좁게' }, { c: 'format:line-spacing-increase', l: '줄 간격 넓게' }, { c: 'format:para-shape', l: '문단 모양…' }],
     ] },
     { label: '스타일', big: [{ c: 'format:style-dialog', i: '🅰', l: '스타일' }] },
-    { label: '찾기', big: [{ c: 'edit:find', i: '🔍', l: '찾기' }, { c: 'edit:find-replace', i: '🔁', l: '찾아 바꾸기' }] },
+    { label: '편집', big: [{ c: 'edit:find', i: '🔍', l: '찾기' }, { c: 'edit:find-replace', i: '🔁', l: '찾아 바꾸기' }], rows: [
+      [{ c: 'edit:select-all', l: '모두 선택' }],
+    ] },
   ] },
   { id: 'insert', label: '입력', groups: [
     { label: '넣기', big: [
@@ -65,12 +55,12 @@ const RIBBON = [
       { c: 'insert:textbox', i: '▭', l: '글상자' }, { c: 'insert:symbols', i: '※', l: '문자표' }, { c: 'insert:equation', i: '∑', l: '수식' },
     ] },
     { label: '참조', rows: [
-      [{ c: 'insert:hyperlink', l: '하이퍼링크' }, { c: 'insert:bookmark', l: '책갈피' }, { c: 'insert:field', l: '누름틀' }],
-      [{ c: 'insert:footnote', l: '각주' }, { c: 'insert:endnote', l: '미주' }, { c: 'insert:comment', l: '주석' }],
+      [{ c: 'insert:hyperlink', l: '하이퍼링크' }, { c: 'insert:bookmark', l: '책갈피' }],
+      [{ c: 'insert:footnote', l: '각주' }],
     ] },
     { label: '개체', rows: [
-      [{ c: 'insert:arrange-front', l: '맨 앞으로' }, { c: 'insert:arrange-back', l: '맨 뒤로' }, { c: 'format:object-properties', l: '개체 속성…' }],
-      [{ c: 'insert:group-shapes', l: '묶기' }, { c: 'insert:ungroup-shapes', l: '풀기' }, { c: 'insert:picture-delete', l: '개체 지우기' }],
+      [{ c: 'insert:arrange-front', l: '맨 앞으로' }, { c: 'insert:arrange-back', l: '맨 뒤로' }],
+      [{ c: 'format:object-properties', l: '개체 속성…' }, { c: 'insert:picture-delete', l: '개체 지우기' }],
     ] },
   ] },
   { id: 'table', label: '표', groups: [
@@ -87,20 +77,15 @@ const RIBBON = [
       [{ c: 'table:cell-height-equal', l: '높이 같게' }, { c: 'table:cell-width-equal', l: '너비 같게' }],
     ] },
     { label: '모양', big: [{ c: 'table:cell-props', i: '⚙', l: '표/셀 속성' }, { c: 'table:border-each', i: '▣', l: '테두리' }] },
-    { label: '계산', rows: [
-      [{ c: 'table:block-sum', l: '합계' }, { c: 'table:block-avg', l: '평균' }],
-      [{ c: 'table:formula', l: '계산식…' }],
-    ] },
   ] },
   { id: 'page', label: '쪽', groups: [
-    { label: '쪽 설정', big: [{ c: 'page:setup', i: '📐', l: '편집 용지' }, { c: 'page:break', i: '⤓', l: '쪽 나누기' }, { c: 'page:page-border', i: '▢', l: '쪽 테두리' }] },
+    { label: '쪽 설정', big: [{ c: 'page:setup', i: '📐', l: '편집 용지' }, { c: 'page:break', i: '⤓', l: '쪽 나누기' }] },
     { label: '단', rows: [
       [{ c: 'page:col-1', l: '하나' }, { c: 'page:col-2', l: '둘' }, { c: 'page:col-3', l: '셋' }],
-      [{ c: 'page:col-settings', l: '다단 설정…' }, { c: 'page:column-break', l: '단 나누기' }],
     ] },
     { label: '머리말 · 꼬리말', rows: [
       [{ c: 'page:header-create', l: '머리말' }, { c: 'page:footer-create', l: '꼬리말' }, { c: 'page:headerfooter-close', l: '닫기' }],
-      [{ c: 'page:insert-field-pagenum', l: '쪽 번호 넣기' }, { c: 'page:new-page-num', l: '새 번호로 시작' }],
+      [{ c: 'page:insert-field-pagenum', l: '쪽 번호 넣기' }],
     ] },
   ] },
   { id: 'view', label: '보기', groups: [
@@ -109,8 +94,7 @@ const RIBBON = [
       { c: 'view:zoom-100', i: '1:1', l: '100%' }, { c: 'view:zoom-fit-width', i: '↔', l: '폭 맞춤' }, { c: 'view:zoom-fit-page', i: '▯', l: '쪽 맞춤' },
     ] },
     { label: '표시', rows: [
-      [{ c: 'view:para-mark', l: '문단 부호' }, { c: 'view:ctrl-mark', l: '조판 부호' }],
-      [{ c: 'view:toggle-grid', l: '격자' }, { c: 'view:border-transparent', l: '투명 선' }],
+      [{ c: 'view:para-mark', l: '문단 부호' }],
     ] },
   ] },
 ];
@@ -168,7 +152,7 @@ async function refreshEnabled() {
   try {
     const list = await studio.commands.list();
     const map = new Map(list.map((c) => [c.id, c.enabled]));
-    ribbonEl.querySelectorAll('[data-hcmd]').forEach((b) => { b.disabled = map.get(b.dataset.hcmd) === false; });
+    document.querySelectorAll('#hwpRibbon [data-hcmd], #quick [data-hcmd]').forEach((b) => { b.disabled = map.get(b.dataset.hcmd) === false; });
   } catch { /* 무시 */ }
 }
 
@@ -251,6 +235,8 @@ async function openInHangul() {
 }
 
 const ACTS = {
+  // 제목 줄의 "저장": 지금 열린 형식 그대로 저장한다
+  saveCurrent: () => save(cur.format === 'hwpx' ? 'hwpx' : 'hwp'),
   open: () => ctx.pickFile(),
   newDocx: () => ctx.newDocx(),
   newHwp: () => newDocument(),
@@ -313,12 +299,14 @@ export function initHwp(context) {
     tabsEl.querySelectorAll('[data-htab]').forEach((b) => b.classList.toggle('on', b === t));
     ribbonEl.querySelectorAll('.panel').forEach((p) => { p.hidden = p.dataset.hpanel !== t.dataset.htab; });
   });
-  ribbonEl.addEventListener('click', (e) => {
+  const onClick = (e) => {
     const b = e.target.closest('button');
     if (!b || b.disabled) return;
     if (b.dataset.hcmd) runCommand(b.dataset.hcmd);
     else if (b.dataset.hact && ACTS[b.dataset.hact]) ACTS[b.dataset.hact]();
-  });
+  };
+  ribbonEl.addEventListener('click', onClick);
+  $('#quickHwp')?.addEventListener('click', onClick);
   enabledTimer = setInterval(refreshEnabled, 1500);
   // 리본을 누르고 돌아왔을 때 단추 상태를 바로 맞춘다
   addEventListener('blur', () => setTimeout(refreshEnabled, 200));

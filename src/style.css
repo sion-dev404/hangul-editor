@@ -186,6 +186,18 @@ body[data-mode="docx"] #hwpUi, body[data-mode="docx"] #studioHost { display: non
 #modeBadge + #saveState { margin-left: 0; }
 .gbody { display: flex; align-items: center; gap: 6px; flex: 1; }
 .rows { display: flex; flex-direction: column; gap: 4px; }
+/* 빠른 실행 줄 (제목 줄): 화면 종류에 맞는 쪽만 보인다 */
+.quick { display: flex; gap: 2px; }
+.quick button {
+  border: 0; background: transparent; color: #fff; width: 32px; height: 30px; border-radius: 5px;
+  cursor: pointer; font-size: 16px; line-height: 1;
+}
+.quick button:hover { background: rgba(255,255,255,.2); }
+.quick button:disabled { opacity: .35; cursor: default; background: transparent; }
+body[data-mode="hwp"] #quickDocx, body[data-mode="docx"] #quickHwp { display: none; }
+/* 파일 탭은 한글처럼 따로 눈에 띄게 */
+.tabs button[data-tab="file"], .tabs button[data-htab="file"] { background: var(--blue-d); margin-right: 6px; }
+.tabs button[data-tab="file"].on, .tabs button[data-htab="file"].on { background: #f6f7f9; }
 .ribbon button:disabled { opacity: .35; cursor: default; }
 .ribbon button:disabled:hover { background: transparent; border-color: transparent; }
 .ribbon button.sq sup, .ribbon button.sq sub { font-size: 9px; }

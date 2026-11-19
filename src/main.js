@@ -764,6 +764,33 @@ const actions = {
   print() { flush(); window.print(); },
   undo() { step(-1); },
   redo() { step(1); },
+  copy() { restoreSel(); document.execCommand('copy'); },
+  cut() { restoreSel(); document.execCommand('cut'); changed(); },
+  async paste() {
+    // 단추로 붙일 때: 서식 있는 내용이 있으면 그대로, 없으면 글만
+    restoreSel();
+    try {
+      for (const item of await navigator.clipboard.read()) {
+        if (item.types.includes('text/html')) {
+          const html = await (await item.getType('text/html')).text();
+          document.execCommand('insertHTML', false, sanitize(html));
+          changed();
+          return;
+        }
+        if (item.types.includes('text/plain')) {
+          document.execCommand('insertText', false, await (await item.getType('text/plain')).text());
+          changed();
+          return;
+        }
+      }
+      toast('붙일 내용이 없습니다');
+    } catch {
+      try {
+        const t = await navigator.clipboard.readText();
+        if (t) { restoreSel(); document.execCommand('insertText', false, t); changed(); }
+      } catch { toast('붙이지 못했습니다. 문서 안을 누른 뒤 다시 시도하세요'); }
+    }
+  },
   find() { $('#findDlg').hidden = false; },
   findClose() { $('#findDlg').hidden = true; },
   findNext() { findNext(); },
@@ -798,6 +825,7 @@ function init() {
   document.body.dataset.mode = 'docx'; // 시작 모드는 아래 startMode에서 정한다
   // 고르기 상자 채우기
   $('#sizeSel').innerHTML = SIZES.map((s) => `<option value="${s}">${s}pt</option>`).join('');
+  $('#sizeSel').value = '10'; // 새 문서 기본 글자 크기
   $('#popColor').innerHTML = `<div class="swatches">${COLORS.map((c) => `<button data-color="${c}" style="background:${c}" title="${c}"></button>`).join('')}</div>`;
   $('#popHilite').innerHTML = `<div class="swatches">${HILITES.map((c) => `<button data-hilite="${c}" style="background:${c === 'transparent' ? '#fff' : c}">${c === 'transparent' ? '없음' : ''}</button>`).join('')}</div>`;
   $('#popChars').innerHTML = [...CHARS].map((c) => `<button data-char="${c}">${c}</button>`).join('');
