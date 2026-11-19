@@ -1,5 +1,7 @@
 // 한글 문서(.hwp/.hwpx) 모드: rhwp 편집기를 안에 띄우고, 워드식 리본으로 조종한다
 import { createStudio } from '@rhwp/editor';
+import { icon } from './icons.js';
+import { putRecovery, getRecovery, delRecovery, clock } from './recovery.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const host = $('#studioHost');
@@ -15,21 +17,21 @@ const cur = { name: '새 문서', dir: null, format: 'hwp' };
 const RIBBON = [
   { id: 'file', label: '파일', groups: [
     { label: '문서', big: [
-      { a: 'newHwp', i: '📄', l: '새 한글 문서' },
-      { a: 'newDocx', i: '📝', l: '새 워드 문서' },
-      { a: 'open', i: '📂', l: '불러오기', s: '.hwp .hwpx .docx' },
+      { a: 'newHwp', i: 'doc', l: '새 한글 문서' },
+      { a: 'newDocx', i: 'docw', l: '새 워드 문서' },
+      { a: 'open', i: 'open', l: '불러오기', s: '.hwp .hwpx .docx' },
     ] },
     { label: '저장', big: [
-      { a: 'saveHwp', i: '💾', l: '한글로 저장', s: '.hwp' },
-      { a: 'saveHwpx', i: '💾', l: '한글로 저장', s: '.hwpx' },
-      { a: 'saveDocx', i: '💾', l: '워드로 저장', s: '.docx' },
-      { c: 'file:print-to-pdf', i: '📕', l: 'PDF로 저장' },
-      { c: 'file:print', i: '🖨️', l: '인쇄' },
+      { a: 'saveHwp', i: 'save', l: '한글로 저장', s: '.hwp' },
+      { a: 'saveHwpx', i: 'save', l: '한글로 저장', s: '.hwpx' },
+      { a: 'saveDocx', i: 'save', l: '워드로 저장', s: '.docx' },
+      { c: 'file:print-to-pdf', i: 'pdf', l: 'PDF로 저장' },
+      { c: 'file:print', i: 'print', l: '인쇄' },
     ] },
-    { label: '원본 확인', big: [{ a: 'openInHangul', i: '🔎', l: '한글에서 열어 보기', desktopOnly: true }] },
+    { label: '원본 확인', big: [{ a: 'openInHangul', i: 'openhwp', l: '한글에서 열어 보기', desktopOnly: true }] },
   ] },
-  { id: 'home', label: '홈', groups: [
-    { label: '클립보드', big: [{ c: 'edit:paste', i: '📋', l: '붙이기' }], rows: [
+  { id: 'home', label: '편집', groups: [
+    { label: '클립보드', big: [{ c: 'edit:paste', i: 'paste', l: '붙이기' }], rows: [
       [{ c: 'edit:cut', l: '오려 두기' }, { c: 'edit:copy', l: '복사' }],
       [{ c: 'edit:format-copy', l: '모양 복사' }, { c: 'edit:format-paste', l: '모양 붙이기' }],
     ] },
@@ -44,15 +46,15 @@ const RIBBON = [
         { c: 'format:level-decrease', l: '⇤ 내어쓰기' }, { c: 'format:level-increase', l: '⇥ 들여쓰기' }],
       [{ c: 'format:line-spacing-decrease', l: '줄 간격 좁게' }, { c: 'format:line-spacing-increase', l: '줄 간격 넓게' }, { c: 'format:para-shape', l: '문단 모양…' }],
     ] },
-    { label: '스타일', big: [{ c: 'format:style-dialog', i: '🅰', l: '스타일' }] },
-    { label: '편집', big: [{ c: 'edit:find', i: '🔍', l: '찾기' }, { c: 'edit:find-replace', i: '🔁', l: '찾아 바꾸기' }], rows: [
+    { label: '스타일', big: [{ c: 'format:style-dialog', i: 'style', l: '스타일' }] },
+    { label: '편집', big: [{ c: 'edit:find', i: 'find', l: '찾기' }, { c: 'edit:find-replace', i: 'replace', l: '찾아 바꾸기' }], rows: [
       [{ c: 'edit:select-all', l: '모두 선택' }],
     ] },
   ] },
   { id: 'insert', label: '입력', groups: [
     { label: '넣기', big: [
-      { c: 'table:create', i: '▦', l: '표' }, { c: 'insert:image', i: '🖼️', l: '그림' }, { c: 'insert:shape', i: '⬠', l: '도형' },
-      { c: 'insert:textbox', i: '▭', l: '글상자' }, { c: 'insert:symbols', i: '※', l: '문자표' }, { c: 'insert:equation', i: '∑', l: '수식' },
+      { c: 'table:create', i: 'table', l: '표' }, { c: 'insert:image', i: 'image', l: '그림' }, { c: 'insert:shape', i: 'shape', l: '도형' },
+      { c: 'insert:textbox', i: 'textbox', l: '글상자' }, { c: 'insert:symbols', i: 'symbol', l: '문자표' }, { c: 'insert:equation', i: 'equation', l: '수식' },
     ] },
     { label: '참조', rows: [
       [{ c: 'insert:hyperlink', l: '하이퍼링크' }, { c: 'insert:bookmark', l: '책갈피' }],
@@ -76,10 +78,10 @@ const RIBBON = [
       [{ c: 'table:cell-merge', l: '셀 합치기' }, { c: 'table:cell-split', l: '셀 나누기' }],
       [{ c: 'table:cell-height-equal', l: '높이 같게' }, { c: 'table:cell-width-equal', l: '너비 같게' }],
     ] },
-    { label: '모양', big: [{ c: 'table:cell-props', i: '⚙', l: '표/셀 속성' }, { c: 'table:border-each', i: '▣', l: '테두리' }] },
+    { label: '모양', big: [{ c: 'table:cell-props', i: 'gear', l: '표/셀 속성' }, { c: 'table:border-each', i: 'border', l: '테두리' }] },
   ] },
   { id: 'page', label: '쪽', groups: [
-    { label: '쪽 설정', big: [{ c: 'page:setup', i: '📐', l: '편집 용지' }, { c: 'page:break', i: '⤓', l: '쪽 나누기' }] },
+    { label: '쪽 설정', big: [{ c: 'page:setup', i: 'pagesetup', l: '편집 용지' }, { c: 'page:break', i: 'pagebreak', l: '쪽 나누기' }] },
     { label: '단', rows: [
       [{ c: 'page:col-1', l: '하나' }, { c: 'page:col-2', l: '둘' }, { c: 'page:col-3', l: '셋' }],
     ] },
@@ -90,8 +92,8 @@ const RIBBON = [
   ] },
   { id: 'view', label: '보기', groups: [
     { label: '화면 확대', big: [
-      { c: 'view:zoom-out', i: '－', l: '축소' }, { c: 'view:zoom-in', i: '＋', l: '확대' },
-      { c: 'view:zoom-100', i: '1:1', l: '100%' }, { c: 'view:zoom-fit-width', i: '↔', l: '폭 맞춤' }, { c: 'view:zoom-fit-page', i: '▯', l: '쪽 맞춤' },
+      { c: 'view:zoom-out', i: 'zoomout', l: '축소' }, { c: 'view:zoom-in', i: 'zoomin', l: '확대' },
+      { c: 'view:zoom-100', i: 'zoom100', l: '100%' }, { c: 'view:zoom-fit-width', i: 'zoomfit', l: '폭 맞춤' }, { c: 'view:zoom-fit-page', i: 'zoomfitpage', l: '쪽 맞춤' },
     ] },
     { label: '표시', rows: [
       [{ c: 'view:para-mark', l: '문단 부호' }],
@@ -102,7 +104,7 @@ const RIBBON = [
 function btnHtml(b, big) {
   const attr = b.c ? `data-hcmd="${b.c}"` : `data-hact="${b.a}"`;
   const extra = b.desktopOnly ? ' data-desktop-only hidden' : '';
-  if (big) return `<button class="big" ${attr}${extra}><i>${b.i}</i>${b.l}${b.s ? `<small>${b.s}</small>` : ''}</button>`;
+  if (big) return `<button class="big" ${attr}${extra}><i>${icon(b.i)}</i>${b.l}${b.s ? `<small>${b.s}</small>` : ''}</button>`;
   if (b.sq) return `<button class="sq" ${attr} title="${b.t}">${b.sq}</button>`;
   return `<button ${attr}>${b.l}</button>`;
 }
@@ -182,6 +184,39 @@ async function isDirty() {
   try { return !!(await studio.getDocumentState()).dirty; } catch { return false; }
 }
 
+/* ---------- 자동 복구 ---------- */
+const REC = 'hwp';
+let recoverBusy = false;
+// 고친 내용이 있으면 몇 초마다 문서를 보관소에 넣어 둔다. 저장하면 지운다.
+async function autoRecover() {
+  if (recoverBusy || !studio || document.body.dataset.mode !== 'hwp') return;
+  recoverBusy = true;
+  try {
+    if (!(await isDirty())) return;
+    const bytes = await studio.exportHwp();
+    const ok = await putRecovery(REC, { name: ctx.getName(), bytes, time: Date.now(), format: cur.format, dir: cur.dir });
+    ctx.setSaveState?.(ok ? `자동 복구 저장 ${clock()}` : '자동 복구 저장 불가');
+  } catch { /* 다음 차례에 다시 */ } finally { recoverBusy = false; }
+}
+
+// 지난번에 저장하지 못하고 닫힌 문서가 있으면 되살릴지 묻는다
+export async function offerRecovery() {
+  const rec = await getRecovery(REC);
+  if (!rec?.bytes) return false;
+  const when = new Date(rec.time).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  if (!confirm(`저장하지 못하고 닫힌 문서가 있습니다.\n\n문서: ${rec.name}\n마지막 자동 보관: ${when}\n\n되살릴까요? (아니오를 누르면 이 보관본은 지웁니다)`)) {
+    await delRecovery(REC);
+    return false;
+  }
+  const ok = await openHwp(new Uint8Array(rec.bytes), `${rec.name}.${rec.format === 'hwpx' ? 'hwpx' : 'hwp'}`, rec.dir ? `${rec.dir}\\${rec.name}` : null, undefined, true);
+  if (ok) {
+    cur.dir = rec.dir || null;
+    ctx.toast('자동 보관된 문서를 되살렸습니다. 꼭 저장해 주세요');
+    ctx.setSaveState?.('복구됨 · 저장 필요');
+  }
+  return ok;
+}
+
 async function save(fmt) {
   const s = await ensureStudio();
   const name = ctx.getName();
@@ -202,6 +237,8 @@ async function save(fmt) {
       download(bytes, `${name}.${fmt}`, fmt === 'hwpx' ? 'application/vnd.hancom.hwpx' : 'application/x-hwp');
     }
     await s.notifySaved(`${ctx.getName()}.${fmt}`).catch(() => {});
+    await delRecovery(REC);
+    ctx.setSaveState?.(`저장됨 ${clock()}`);
     ctx.toast(`한글 문서(.${fmt})로 저장했습니다`);
   } catch (e) {
     console.error(e);
@@ -253,23 +290,27 @@ export async function newDocument() {
     await s.commands.execute('file:new-doc', undefined, { allowDialog: true });
     cur.dir = null; cur.format = 'hwp'; cur.origin = 'hwp';
     ctx.setName('새 문서');
+    ctx.setSaveState?.('자동 복구 켜짐');
     ctx.setBadge('한글 문서');
   } catch (e) { console.error(e); ctx.toast('한글 편집기를 불러오지 못했습니다'); }
   focusDoc();
 }
 
 // origin: 'docx'이면 워드 문서를 한글 형식으로 변환해서 여는 경우
-export async function openHwp(bytes, fileName, filePath, origin) {
+export async function openHwp(bytes, fileName, filePath, origin, keepRecovery) {
   ctx.setMode('hwp');
   if (!origin) ctx.toast('한글 문서를 여는 중…');
   const s = await ensureStudio();
   if (await isDirty() && !confirm('지금 문서에 저장하지 않은 내용이 있습니다. 버리고 다른 문서를 열까요?')) return false;
+  // 다른 문서를 열면 이전 문서의 자동 보관본은 필요 없다 (되살린 문서일 때만 남긴다)
+  if (!keepRecovery) await delRecovery(REC);
   const base = fileName.replace(/\.(hwpx?|docx)$/i, '');
   const res = await s.loadFile(bytes, origin === 'docx' ? `${base}.hwp` : fileName, { skipUnsavedGuard: true });
   cur.format = /\.hwpx$/i.test(fileName) ? 'hwpx' : 'hwp';
   cur.origin = origin || 'hwp';
   cur.dir = filePath ? filePath.replace(/[\\/][^\\/]*$/, '') : null;
   ctx.setName(base);
+  ctx.setSaveState?.('자동 복구 켜짐');
   ctx.setBadge(origin === 'docx' ? '워드 문서' : '한글 문서');
   ctx.toast(origin === 'docx'
     ? `워드 문서를 열었습니다 (${res.pageCount}쪽). 저장할 때는 파일 탭의 "워드로 저장"을 누르세요`
@@ -281,7 +322,7 @@ export async function openHwp(bytes, fileName, filePath, origin) {
 
 export async function showHwp() {
   ctx.setMode('hwp');
-  try { await ensureStudio(); } catch (e) { console.error(e); ctx.toast('한글 편집기를 불러오지 못했습니다'); }
+  try { await ensureStudio(); ctx.setSaveState?.('자동 복구 켜짐'); } catch (e) { console.error(e); ctx.toast('한글 편집기를 불러오지 못했습니다'); }
 }
 
 export function initHwp(context) {
@@ -308,6 +349,9 @@ export function initHwp(context) {
   ribbonEl.addEventListener('click', onClick);
   $('#quickHwp')?.addEventListener('click', onClick);
   enabledTimer = setInterval(refreshEnabled, 1500);
+  setInterval(autoRecover, 15000);
+  // 창을 내리거나 닫기 직전에도 한 번 보관한다
+  document.addEventListener('visibilitychange', () => { if (document.hidden) autoRecover(); });
   // 리본을 누르고 돌아왔을 때 단추 상태를 바로 맞춘다
   addEventListener('blur', () => setTimeout(refreshEnabled, 200));
   return { enabledTimer };

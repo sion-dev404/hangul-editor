@@ -1,5 +1,7 @@
 import './style.css';
-import { initHwp, openHwp, showHwp, newDocument as newHwpDocument } from './hwp-mode.js';
+import { initHwp, openHwp, showHwp, newDocument as newHwpDocument, offerRecovery } from './hwp-mode.js';
+import { icon } from './icons.js';
+import { putRecovery, getRecovery, clock } from './recovery.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -155,12 +157,16 @@ function step(d) {
 }
 
 function autosave() {
+  const snap = { html: editor.innerHTML, name: $('#docName').value, ...pageState(), time: Date.now() };
+  // 글이 많거나 그림이 큰 문서는 localStorage에 안 들어가므로 보관소(IndexedDB)에도 넣어 둔다
   try {
-    localStorage.setItem(STORE, JSON.stringify({ html: editor.innerHTML, name: $('#docName').value, ...pageState() }));
-    $('#saveState').textContent = '자동 저장됨';
-  } catch {
-    $('#saveState').textContent = '자동 저장 불가 (용량 초과)';
-  }
+    localStorage.setItem(STORE, JSON.stringify(snap));
+    $('#saveState').textContent = `자동 저장됨 ${clock()}`;
+    return;
+  } catch { /* 용량 초과면 아래 보관소로 */ }
+  putRecovery('docx', snap).then((ok) => {
+    $('#saveState').textContent = ok ? `자동 저장됨 ${clock()}` : '자동 저장 불가';
+  });
 }
 
 /* ---------- 쪽 모양 ---------- */
@@ -204,6 +210,100 @@ function layout() {
   const noSp = [...text.replace(/\s/g, '')].length;
   $('#stat').textContent = `${pages}쪽 · 글자 ${all}자 (공백 빼고 ${noSp}자)`;
   $('#zoomLabel').textContent = `${Math.round(doc.zoom * 100)}%`;
+  $('#zoomSlider').value = String(Math.round(doc.zoom * 100));
+  renderHF(pages, m);
+}
+
+/* ---------- 머리말 · 꼬리말 ---------- */
+// 화면에는 문서 맨 위(머리말)와 맨 아래(꼬리말) 여백에 미리 보여 주고, 눌러서 고친다.
+// 저장할 때는 모든 쪽에 들어간다.
+const escHtml = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const HF_FONT = "font-family:'맑은 고딕';font-size:10pt";
+
+function renderHF(pages, m) {
+  const parts = doc.parts;
+  const hv = $('#hdrView'); const fv = $('#ftrView');
+  const hd = doc.hf?.header ?? 12.5; const ft = doc.hf?.footer ?? 12.5;
+  const fill = (el, html, num) => {
+    el.hidden = !html;
+    if (!html) return;
+    el.innerHTML = html;
+    el.querySelectorAll('[data-field="page"]').forEach((f) => { f.textContent = String(num); });
+    el.style.padding = `0 ${m.r}mm 0 ${m.l}mm`;
+  };
+  fill(hv, parts?.header, 1);
+  fill(fv, parts?.footer, pages);
+  hv.style.top = `${Math.min(hd, Math.max(0, m.t - 5))}mm`;
+  fv.style.bottom = `${Math.min(ft, Math.max(0, m.b - 5))}mm`;
+}
+
+// 저장된 머리말·꼬리말 HTML에서 대화 상자에 보일 값을 뽑는다
+function parseHF(html) {
+  const d = document.createElement('div');
+  d.innerHTML = html || '';
+  const out = { text: '', align: 'left', field: null, complex: !!d.querySelector('img,table') };
+  for (const p of d.querySelectorAll('p')) {
+    const align = p.style.textAlign || 'left';
+    if (p.querySelector('[data-field="page"]')) {
+      const t = p.textContent.trim();
+      const style = /^-\s*\d+\s*-$/.test(t) ? 'dash' : /^\d+\s*쪽$/.test(t) ? 'of' : /^\d+$/.test(t) ? 'plain' : null;
+      if (style) out.field = { align, style }; else out.complex = true;
+    } else if (p.textContent.trim() && !out.text) {
+      out.text = p.textContent.trim(); out.align = align;
+    }
+  }
+  return out;
+}
+
+function buildHF(text, align, field) {
+  const span = (t) => `<span style="${HF_FONT}">${escHtml(t)}</span>`;
+  let html = '';
+  if (text) html += `<p style="text-align:${align}">${span(text)}</p>`;
+  if (field) {
+    const n = `<span data-field="page" style="${HF_FONT}">1</span>`;
+    const inner = field.style === 'dash' ? `${span('- ')}${n}${span(' -')}` : field.style === 'of' ? `${n}${span(' 쪽')}` : n;
+    html += `<p style="text-align:${field.align}">${inner}</p>`;
+  }
+  return html;
+}
+
+let hfInit = null;
+function openHF(focusNum) {
+  const h = parseHF(doc.parts?.header); const f = parseHF(doc.parts?.footer);
+  const fieldIn = f.field ? { where: 'footer', ...f.field } : h.field ? { where: 'header', ...h.field } : null;
+  $('#hfHeader').value = h.text; $('#hfHeaderAlign').value = h.align;
+  $('#hfFooter').value = f.text; $('#hfFooterAlign').value = f.align;
+  $('#hfPageNum').checked = !!fieldIn || !!focusNum;
+  $('#hfNumStyle').value = fieldIn?.style || 'plain';
+  $('#hfNumPos').value = fieldIn ? `${fieldIn.where}-${fieldIn.align}` : 'footer-center';
+  const note = $('#hfNote');
+  note.hidden = !(h.complex || f.complex);
+  note.textContent = '그림이나 표가 든 머리말·꼬리말은 여기서 글을 바꾸면 그림·표가 없어집니다. 바꾸지 않으면 그대로 둡니다.';
+  hfInit = {
+    header: $('#hfHeader').value + $('#hfHeaderAlign').value, footer: $('#hfFooter').value + $('#hfFooterAlign').value,
+    num: hfNumKey(), numWhere: fieldIn?.where || null,
+  };
+  $('#hfDlg').hidden = false;
+  (focusNum ? $('#hfNumPos') : $('#hfHeader')).focus();
+}
+const hfNumKey = () => `${$('#hfPageNum').checked}|${$('#hfNumStyle').value}|${$('#hfNumPos').value}`;
+
+function applyHF() {
+  const [where, align] = $('#hfNumPos').value.split('-');
+  const field = $('#hfPageNum').checked ? { align, style: $('#hfNumStyle').value } : null;
+  const hText = $('#hfHeader').value.trim(); const fText = $('#hfFooter').value.trim();
+  // 번호 설정이 바뀌어도 번호와 상관없는 쪽(머리말/꼬리말)은 원래 내용을 그대로 둔다
+  const numChanged = hfNumKey() !== hfInit.num;
+  const newWhere = field ? where : null;
+  const touches = (w) => numChanged && (hfInit.numWhere === w || newWhere === w);
+  const keepH = !touches('header') && hText + $('#hfHeaderAlign').value === hfInit.header;
+  const keepF = !touches('footer') && fText + $('#hfFooterAlign').value === hfInit.footer;
+  const header = keepH ? (doc.parts?.header || '') : buildHF(hText, $('#hfHeaderAlign').value, field && where === 'header' ? field : null);
+  const footer = keepF ? (doc.parts?.footer || '') : buildHF(fText, $('#hfFooterAlign').value, field && where === 'footer' ? field : null);
+  doc.parts = header || footer ? { header, footer } : null;
+  $('#hfDlg').hidden = true;
+  autosave(); layout();
+  toast(doc.parts ? '머리말·꼬리말을 적용했습니다 (저장하면 모든 쪽에 들어갑니다)' : '머리말·꼬리말을 지웠습니다');
 }
 
 function setZoom(z) {
@@ -791,6 +891,11 @@ const actions = {
       } catch { toast('붙이지 못했습니다. 문서 안을 누른 뒤 다시 시도하세요'); }
     }
   },
+  hf() { openHF(false); },
+  hfNum() { openHF(true); },
+  hfClose() { $('#hfDlg').hidden = true; },
+  hfApply() { applyHF(); },
+  hfRemove() { doc.parts = null; $('#hfDlg').hidden = true; autosave(); layout(); toast('머리말·꼬리말을 지웠습니다'); },
   find() { $('#findDlg').hidden = false; },
   findClose() { $('#findDlg').hidden = true; },
   findNext() { findNext(); },
@@ -840,6 +945,12 @@ function init() {
     const d = e.target.closest('[data-r]');
     if (d) { insertTable(+d.dataset.r, +d.dataset.c); closePops(); paint(0, 0); }
   });
+
+  // 아이콘 단추 채우기, 확대 슬라이더, 머리말·꼬리말 미리 보기 누르기
+  $$('[data-ico]').forEach((el) => { el.innerHTML = icon(el.dataset.ico); });
+  $('#zoomSlider').addEventListener('input', (e) => { userZoomed = true; setZoom(+e.target.value / 100); });
+  $('#hdrView').addEventListener('click', () => openHF(false));
+  $('#ftrView').addEventListener('click', () => openHF(false));
 
   // 단추를 눌러도 글의 선택 영역이 풀리지 않게 한다
   document.addEventListener('mousedown', (e) => {
@@ -903,6 +1014,7 @@ function init() {
     hwpxToDocxBlob,
     saveBytes,
     setName: (n) => { $('#docName').value = n; },
+    setSaveState: (t) => { $('#saveState').textContent = t; },
   });
 
   // 설치형(.exe) 전용 기능
@@ -919,6 +1031,8 @@ function init() {
     let last = 'hwp';
     try { last = localStorage.getItem(MODE_KEY) || 'hwp'; } catch { /* 무시 */ }
     if (last === 'docx') setMode('docx'); else showHwp();
+    // 저장하지 못하고 닫힌 한글 문서가 있으면 되살릴지 묻는다
+    offerRecovery().catch((e) => console.error(e));
   }
   if (!desktop) startMode();
   $('#fileImg').addEventListener('change', (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) insertImage(f); });
@@ -940,14 +1054,24 @@ function init() {
   document.execCommand('styleWithCSS', false, true);
 
   // 이전에 쓰던 문서 되살리기
+  let savedTime = 0;
   try {
     const saved = JSON.parse(localStorage.getItem(STORE) || 'null');
     if (saved) {
+      savedTime = saved.time || 0;
       setContent(sanitize(saved.html || ''));
       if (saved.name) $('#docName').value = saved.name;
       applyPageState(saved);
     } else setContent('');
   } catch { setContent(''); }
+  // 용량이 커서 보관소(IndexedDB)에 넣어 둔 더 새로운 내용이 있으면 그것을 쓴다
+  getRecovery('docx').then((r) => {
+    if (!r?.html || (r.time || 0) <= savedTime || document.body.dataset.mode !== 'docx') return;
+    setContent(sanitize(r.html));
+    if (r.name) $('#docName').value = r.name;
+    applyPageState(r);
+    applyPage(); autoZoom(); record();
+  });
 
   $('#guideBtn').classList.add('active');
   applyPage();

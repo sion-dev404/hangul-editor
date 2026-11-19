@@ -12,17 +12,23 @@
 <body>
   <header class="titlebar">
     <span class="logo">한</span>
-    <!-- 빠른 실행 줄: 어느 화면에서나 같은 자리에서 저장·되돌리기·다시 실행 -->
+    <!-- 빠른 실행 줄: 어느 화면에서나 같은 자리에서 새 문서·열기·저장·인쇄·되돌리기·다시 실행 -->
     <div class="quick" id="quick">
       <span id="quickDocx">
-        <button data-act="save" title="워드(.docx)로 저장">💾</button>
-        <button data-act="undo" title="되돌리기">↶</button>
-        <button data-act="redo" title="다시 실행">↷</button>
+        <button data-act="new" title="새 워드 문서" data-ico="docw"></button>
+        <button data-act="open" title="불러오기" data-ico="open"></button>
+        <button data-act="save" title="워드(.docx)로 저장" data-ico="save"></button>
+        <button data-act="print" title="인쇄 · PDF" data-ico="print"></button>
+        <button data-act="undo" title="되돌리기" data-ico="undo"></button>
+        <button data-act="redo" title="다시 실행" data-ico="redo"></button>
       </span>
       <span id="quickHwp">
-        <button data-hact="saveCurrent" title="저장">💾</button>
-        <button data-hcmd="edit:undo" title="되돌리기">↶</button>
-        <button data-hcmd="edit:redo" title="다시 실행">↷</button>
+        <button data-hact="newHwp" title="새 한글 문서" data-ico="doc"></button>
+        <button data-hact="open" title="불러오기" data-ico="open"></button>
+        <button data-hact="saveCurrent" title="저장" data-ico="save"></button>
+        <button data-hcmd="file:print" title="인쇄" data-ico="print"></button>
+        <button data-hcmd="edit:undo" title="되돌리기" data-ico="undo"></button>
+        <button data-hcmd="edit:redo" title="다시 실행" data-ico="redo"></button>
       </span>
     </div>
     <input id="docName" value="새 문서" aria-label="문서 이름" />
@@ -38,7 +44,7 @@
   <div id="docxUi">
   <nav class="tabs" id="tabs">
     <button data-tab="file">파일</button>
-    <button data-tab="home" class="on">홈</button>
+    <button data-tab="home" class="on">편집</button>
     <button data-tab="insert">입력</button>
     <button data-tab="table">표</button>
     <button data-tab="page">쪽</button>
@@ -50,101 +56,47 @@
     <div class="panel" data-panel="file" hidden>
       <div class="group">
         <div class="row">
-          <button class="big" data-act="newHwp"><i>📄</i>새 한글 문서</button>
-          <button class="big" data-act="new"><i>📝</i>새 워드 문서</button>
-          <button class="big" data-act="open"><i>📂</i>불러오기<small>.hwp .hwpx .docx</small></button>
-          <button class="big" data-act="save"><i>💾</i>워드로 저장<small>.docx</small></button>
-          <button class="big" data-act="saveHwp" id="saveHwpBtn"><i>💾</i>한글로 저장<small>.hwp</small></button>
-          <button class="big" data-act="print"><i>🖨️</i>인쇄 · PDF</button>
+          <button class="big" data-act="newHwp"><i data-ico="doc"></i>새 한글 문서</button>
+          <button class="big" data-act="new"><i data-ico="docw"></i>새 워드 문서</button>
+          <button class="big" data-act="open"><i data-ico="open"></i>불러오기<small>.hwp .hwpx .docx</small></button>
         </div>
-        <div class="glabel">파일</div>
+        <div class="glabel">문서</div>
+      </div>
+      <div class="group">
+        <div class="row">
+          <button class="big" data-act="save"><i data-ico="save"></i>워드로 저장<small>.docx</small></button>
+          <button class="big" data-act="saveHwp" id="saveHwpBtn"><i data-ico="save"></i>한글로 저장<small>.hwp</small></button>
+          <button class="big" data-act="print"><i data-ico="print"></i>인쇄 · PDF</button>
+        </div>
+        <div class="glabel">저장 · 인쇄</div>
       </div>
     </div>
 
-    <!-- 홈 -->
+    <!-- 편집 -->
     <div class="panel" data-panel="home">
       <div class="group">
         <div class="row">
-          <button class="big" data-act="paste"><i>📋</i>붙이기</button>
+          <button class="big" data-act="paste"><i data-ico="paste"></i>붙이기</button>
           <div class="rows">
             <div class="row"><button data-act="cut">오려 두기</button><button data-act="copy">복사</button></div>
-            <div class="row"><button data-cmd="selectAll">모두 선택</button></div>
+            <div class="row"><button data-cmd="selectAll">모두 선택</button><button data-cmd="removeFormat" title="글자 모양 지우기">모양 지우기</button></div>
           </div>
         </div>
         <div class="glabel">클립보드</div>
       </div>
-
       <div class="group">
         <div class="row">
-          <select id="styleSel" title="스타일">
-            <option value="p">바탕글</option>
-            <option value="h1">제목 1</option>
-            <option value="h2">제목 2</option>
-            <option value="h3">제목 3</option>
-          </select>
-        </div>
-        <div class="glabel">스타일</div>
-      </div>
-
-      <div class="group">
-        <div class="row">
-          <select id="fontSel" title="글꼴">
-            <option value="맑은 고딕">맑은 고딕</option>
-            <option value="바탕">바탕</option>
-            <option value="굴림">굴림</option>
-            <option value="돋움">돋움</option>
-            <option value="궁서">궁서</option>
-            <option value="Nanum Gothic">나눔고딕</option>
-            <option value="Nanum Myeongjo">나눔명조</option>
-            <option value="Noto Sans KR">본고딕</option>
-            <option value="Noto Serif KR">본명조</option>
-          </select>
-          <select id="sizeSel" title="글자 크기"></select>
-        </div>
-        <div class="row">
-          <button class="sq" data-cmd="bold" title="진하게"><b>가</b></button>
-          <button class="sq" data-cmd="italic" title="기울임"><em>가</em></button>
-          <button class="sq" data-cmd="underline" title="밑줄"><u>가</u></button>
-          <button class="sq" data-cmd="strikeThrough" title="취소선"><s>가</s></button>
-          <button class="sq" data-pop="popColor" title="글자 색"><span class="colorA">가</span></button>
-          <button class="sq" data-pop="popHilite" title="형광펜"><span class="hiliteA">가</span></button>
-          <button data-cmd="removeFormat" title="글자 모양 지우기">모양 지우기</button>
-        </div>
-        <div class="glabel">글자 모양</div>
-      </div>
-
-      <div class="group">
-        <div class="row">
-          <button class="sq" data-cmd="justifyLeft" title="왼쪽 정렬"><svg viewBox="0 0 16 16"><path d="M1 3h14M1 6.5h9M1 10h14M1 13.5h9" stroke="currentColor" stroke-width="1.5" fill="none"/></svg></button>
-          <button class="sq" data-cmd="justifyCenter" title="가운데 정렬"><svg viewBox="0 0 16 16"><path d="M1 3h14M4 6.5h8M1 10h14M4 13.5h8" stroke="currentColor" stroke-width="1.5" fill="none"/></svg></button>
-          <button class="sq" data-cmd="justifyRight" title="오른쪽 정렬"><svg viewBox="0 0 16 16"><path d="M1 3h14M6 6.5h9M1 10h14M6 13.5h9" stroke="currentColor" stroke-width="1.5" fill="none"/></svg></button>
-          <button class="sq" data-cmd="justifyFull" title="양쪽 정렬"><svg viewBox="0 0 16 16"><path d="M1 3h14M1 6.5h14M1 10h14M1 13.5h14" stroke="currentColor" stroke-width="1.5" fill="none"/></svg></button>
-          <label class="inl">줄 간격
-            <select id="lineSel" title="줄 간격">
-              <option value="1">100%</option>
-              <option value="1.3">130%</option>
-              <option value="1.6">160%</option>
-              <option value="1.8">180%</option>
-              <option value="2">200%</option>
-              <option value="2.5">250%</option>
-              <option value="3">300%</option>
-            </select>
-          </label>
-        </div>
-        <div class="row">
-          <button data-cmd="insertUnorderedList" title="글머리표">● 글머리표</button>
-          <button data-cmd="insertOrderedList" title="문단 번호">1. 번호</button>
-          <button data-cmd="outdent" title="내어쓰기">⇤ 내어쓰기</button>
-          <button data-cmd="indent" title="들여쓰기">⇥ 들여쓰기</button>
-        </div>
-        <div class="glabel">문단 모양</div>
-      </div>
-
-      <div class="group">
-        <div class="row">
-          <button class="big" data-act="find"><i>🔍</i>찾아 바꾸기</button>
+          <button class="big" data-act="find"><i data-ico="find"></i>찾기</button>
+          <button class="big" data-act="find"><i data-ico="replace"></i>찾아 바꾸기</button>
         </div>
         <div class="glabel">찾기</div>
+      </div>
+      <div class="group">
+        <div class="row">
+          <button class="big" data-act="hf"><i data-ico="header"></i>머리말 · 꼬리말</button>
+          <button class="big" data-act="hfNum"><i data-ico="pagenum"></i>쪽 번호</button>
+        </div>
+        <div class="glabel">쪽 꾸미기</div>
       </div>
     </div>
 
@@ -152,14 +104,22 @@
     <div class="panel" data-panel="insert" hidden>
       <div class="group">
         <div class="row">
-          <button class="big" data-pop="popTable"><i>▦</i>표</button>
-          <button class="big" data-act="image"><i>🖼️</i>그림</button>
-          <button class="big" data-pop="popChars"><i>※</i>문자표</button>
-          <button class="big" data-act="date"><i>📅</i>날짜</button>
-          <button class="big" data-act="hr"><i>―</i>가로선</button>
-          <button class="big" data-act="pagebreak"><i>⤓</i>쪽 나누기</button>
+          <button class="big" data-pop="popTable"><i data-ico="table"></i>표</button>
+          <button class="big" data-act="image"><i data-ico="image"></i>그림</button>
+          <button class="big" data-pop="popChars"><i data-ico="symbol"></i>문자표</button>
+          <button class="big" data-act="date"><i data-ico="date"></i>날짜</button>
+          <button class="big" data-act="hr"><i data-ico="hline"></i>가로선</button>
+          <button class="big" data-act="pagebreak"><i data-ico="pagebreak"></i>쪽 나누기</button>
         </div>
-        <div class="glabel">입력</div>
+        <div class="glabel">넣기</div>
+      </div>
+      <div class="group">
+        <div class="row">
+          <button class="big" data-act="hf"><i data-ico="header"></i>머리말</button>
+          <button class="big" data-act="hf"><i data-ico="footer"></i>꼬리말</button>
+          <button class="big" data-act="hfNum"><i data-ico="pagenum"></i>쪽 번호</button>
+        </div>
+        <div class="glabel">머리말 · 꼬리말</div>
       </div>
     </div>
 
@@ -167,7 +127,7 @@
     <div class="panel" data-panel="table" hidden>
       <div class="group">
         <div class="row">
-          <button class="big" data-pop="popTable"><i>▦</i>표 넣기</button>
+          <button class="big" data-pop="popTable"><i data-ico="table"></i>표 넣기</button>
         </div>
         <div class="glabel">만들기</div>
       </div>
@@ -180,7 +140,7 @@
       </div>
       <div class="group">
         <div class="row">
-          <button class="big" data-act="tblDel"><i>🗑</i>표 지우기</button>
+          <button class="big" data-act="tblDel"><i data-ico="trash"></i>표 지우기</button>
         </div>
         <div class="glabel">지우기</div>
       </div>
@@ -190,18 +150,25 @@
     <div class="panel" data-panel="page" hidden>
       <div class="group">
         <div class="row">
-          <button class="big" data-orient="portrait"><i>▯</i>세로</button>
-          <button class="big" data-orient="landscape"><i>▭</i>가로</button>
+          <button class="big" data-orient="portrait"><i data-ico="portrait"></i>세로</button>
+          <button class="big" data-orient="landscape"><i data-ico="landscape"></i>가로</button>
         </div>
         <div class="glabel">용지 방향 (A4)</div>
       </div>
       <div class="group">
         <div class="row">
-          <button class="big" data-margin="narrow"><i>▫</i>좁게</button>
-          <button class="big" data-margin="normal"><i>▫</i>보통</button>
-          <button class="big" data-margin="wide"><i>▫</i>넓게</button>
+          <button class="big" data-margin="narrow"><i data-ico="marginnarrow"></i>좁게</button>
+          <button class="big" data-margin="normal"><i data-ico="marginnormal"></i>보통</button>
+          <button class="big" data-margin="wide"><i data-ico="marginwide"></i>넓게</button>
         </div>
         <div class="glabel">쪽 여백</div>
+      </div>
+      <div class="group">
+        <div class="row">
+          <button class="big" data-act="hf"><i data-ico="header"></i>머리말 · 꼬리말</button>
+          <button class="big" data-act="hfNum"><i data-ico="pagenum"></i>쪽 번호</button>
+        </div>
+        <div class="glabel">머리말 · 꼬리말</div>
       </div>
     </div>
 
@@ -209,21 +176,71 @@
     <div class="panel" data-panel="view" hidden>
       <div class="group">
         <div class="row">
-          <button class="big" data-act="zoomOut"><i>－</i>축소</button>
-          <button class="big" data-act="zoomIn"><i>＋</i>확대</button>
-          <button class="big" data-act="zoom100"><i>1:1</i>100%</button>
-          <button class="big" data-act="zoomFit"><i>↔</i>폭 맞춤</button>
+          <button class="big" data-act="zoomOut"><i data-ico="zoomout"></i>축소</button>
+          <button class="big" data-act="zoomIn"><i data-ico="zoomin"></i>확대</button>
+          <button class="big" data-act="zoom100"><i data-ico="zoom100"></i>100%</button>
+          <button class="big" data-act="zoomFit"><i data-ico="zoomfit"></i>폭 맞춤</button>
         </div>
         <div class="glabel">화면 확대</div>
       </div>
       <div class="group">
         <div class="row">
-          <button class="big" data-act="guides" id="guideBtn"><i>┄</i>쪽 경계</button>
+          <button class="big" data-act="guides" id="guideBtn"><i data-ico="guides"></i>쪽 경계</button>
         </div>
         <div class="glabel">표시</div>
       </div>
     </div>
   </section>
+
+  <!-- 서식 줄: 한글처럼 탭을 바꿔도 늘 보이는 글꼴·크기·정렬 줄 -->
+  <div class="fmtbar" id="fmtBar">
+    <select id="styleSel" title="스타일">
+      <option value="p">바탕글</option>
+      <option value="h1">제목 1</option>
+      <option value="h2">제목 2</option>
+      <option value="h3">제목 3</option>
+    </select>
+    <select id="fontSel" title="글꼴">
+      <option value="맑은 고딕">맑은 고딕</option>
+      <option value="바탕">바탕</option>
+      <option value="굴림">굴림</option>
+      <option value="돋움">돋움</option>
+      <option value="궁서">궁서</option>
+      <option value="Nanum Gothic">나눔고딕</option>
+      <option value="Nanum Myeongjo">나눔명조</option>
+      <option value="Noto Sans KR">본고딕</option>
+      <option value="Noto Serif KR">본명조</option>
+    </select>
+    <select id="sizeSel" title="글자 크기"></select>
+    <span class="sep"></span>
+    <button class="sq" data-cmd="bold" title="진하게"><b>가</b></button>
+    <button class="sq" data-cmd="italic" title="기울임"><em>가</em></button>
+    <button class="sq" data-cmd="underline" title="밑줄"><u>가</u></button>
+    <button class="sq" data-cmd="strikeThrough" title="취소선"><s>가</s></button>
+    <button class="sq" data-pop="popColor" title="글자 색"><span class="colorA">가</span></button>
+    <button class="sq" data-pop="popHilite" title="형광펜"><span class="hiliteA">가</span></button>
+    <span class="sep"></span>
+    <button class="sq" data-cmd="justifyLeft" title="왼쪽 정렬"><svg viewBox="0 0 16 16"><path d="M1 3h14M1 6.5h9M1 10h14M1 13.5h9" stroke="currentColor" stroke-width="1.5" fill="none"/></svg></button>
+    <button class="sq" data-cmd="justifyCenter" title="가운데 정렬"><svg viewBox="0 0 16 16"><path d="M1 3h14M4 6.5h8M1 10h14M4 13.5h8" stroke="currentColor" stroke-width="1.5" fill="none"/></svg></button>
+    <button class="sq" data-cmd="justifyRight" title="오른쪽 정렬"><svg viewBox="0 0 16 16"><path d="M1 3h14M6 6.5h9M1 10h14M6 13.5h9" stroke="currentColor" stroke-width="1.5" fill="none"/></svg></button>
+    <button class="sq" data-cmd="justifyFull" title="양쪽 정렬"><svg viewBox="0 0 16 16"><path d="M1 3h14M1 6.5h14M1 10h14M1 13.5h14" stroke="currentColor" stroke-width="1.5" fill="none"/></svg></button>
+    <label class="inl">줄 간격
+      <select id="lineSel" title="줄 간격">
+        <option value="1">100%</option>
+        <option value="1.3">130%</option>
+        <option value="1.6">160%</option>
+        <option value="1.8">180%</option>
+        <option value="2">200%</option>
+        <option value="2.5">250%</option>
+        <option value="3">300%</option>
+      </select>
+    </label>
+    <span class="sep"></span>
+    <button data-cmd="insertUnorderedList" title="글머리표">● 글머리표</button>
+    <button data-cmd="insertOrderedList" title="문단 번호">1. 번호</button>
+    <button data-cmd="outdent" title="내어쓰기">⇤</button>
+    <button data-cmd="indent" title="들여쓰기">⇥</button>
+  </div>
   </div>
 
   <div id="studioHost"></div>
@@ -231,8 +248,10 @@
   <main class="workspace" id="workspace">
     <div id="holder">
       <div id="page">
+        <div id="hdrView" class="hfview" hidden title="눌러서 머리말을 고칩니다"></div>
         <div id="guides"></div>
         <div id="editor" contenteditable="true" spellcheck="false"></div>
+        <div id="ftrView" class="hfview" hidden title="눌러서 꼬리말을 고칩니다"></div>
       </div>
     </div>
   </main>
@@ -240,9 +259,11 @@
   <footer class="status" id="docxStatus">
     <span id="stat"></span>
     <span class="grow"></span>
-    <button data-act="zoomOut" class="mini">－</button>
+    <button data-act="zoomOut" class="mini" title="축소">－</button>
+    <input type="range" id="zoomSlider" min="30" max="300" step="5" value="100" aria-label="화면 확대" />
+    <button data-act="zoomIn" class="mini" title="확대">＋</button>
     <span id="zoomLabel">100%</span>
-    <button data-act="zoomIn" class="mini">＋</button>
+    <button data-act="zoomFit" class="mini wide" title="폭 맞춤">폭 맞춤</button>
   </footer>
 
   <!-- 팝업 -->
@@ -262,6 +283,36 @@
       <button data-act="findNext">다음 찾기</button>
       <button data-act="replOne">바꾸기</button>
       <button data-act="replAll">모두 바꾸기</button>
+    </div>
+  </div>
+
+  <div class="dialog" id="hfDlg" hidden>
+    <div class="dlgTitle">머리말 · 꼬리말 <button data-act="hfClose" class="mini">✕</button></div>
+    <label>머리말 <input id="hfHeader" placeholder="모든 쪽 위에 들어갈 글" /></label>
+    <label>정렬
+      <select id="hfHeaderAlign"><option value="left">왼쪽</option><option value="center">가운데</option><option value="right">오른쪽</option></select>
+    </label>
+    <label>꼬리말 <input id="hfFooter" placeholder="모든 쪽 아래에 들어갈 글" /></label>
+    <label>정렬
+      <select id="hfFooterAlign"><option value="left">왼쪽</option><option value="center">가운데</option><option value="right">오른쪽</option></select>
+    </label>
+    <label class="chk"><input type="checkbox" id="hfPageNum" /> 쪽 번호 넣기</label>
+    <label>번호 모양
+      <select id="hfNumStyle"><option value="plain">1</option><option value="dash">- 1 -</option><option value="of">1 쪽</option></select>
+    </label>
+    <label>번호 위치
+      <select id="hfNumPos">
+        <option value="footer-center">꼬리말 가운데</option>
+        <option value="footer-right">꼬리말 오른쪽</option>
+        <option value="footer-left">꼬리말 왼쪽</option>
+        <option value="header-right">머리말 오른쪽</option>
+        <option value="header-center">머리말 가운데</option>
+      </select>
+    </label>
+    <p id="hfNote" class="note" hidden></p>
+    <div class="row">
+      <button data-act="hfApply">확인</button>
+      <button data-act="hfRemove">모두 지우기</button>
     </div>
   </div>
 
