@@ -11,10 +11,18 @@ class_name = "DocRoom"
 name = "LIMIT"
 class_name = "Limiter"
 
+[[durable_objects.bindings]]
+name = "VAULT"
+class_name = "Vault"
+
 # 무료 요금제는 SQLite 저장소를 쓰는 Durable Object만 된다
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["DocRoom", "Limiter"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["Vault"]
 
 [vars]
 # 이 주소에서 연 편집기만 서버를 쓸 수 있다 (웹판, 설치형 내장 서버, 개발 서버)

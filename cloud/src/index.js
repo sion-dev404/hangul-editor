@@ -155,6 +155,94 @@ async function authExchange(req, env) {
   return json({ token, user: { email: user.email, name: user.name } });
 }
 
+/* ---------- 내 문서함 (한컴독스처럼 어느 PC에서나) ----------
+ * 문서 열쇠·이름을 서버 비밀키(VAULT_SECRET, 로그인 서명 키와 별도)로 다시 잠가 계정별 보관함(Vault)에 둔다.
+ * - 잠금 열쇠 = HKDF(VAULT_SECRET, 계정 이메일) → 계정마다 다름. 문서 id를 함께 묶어(AAD) 다른 칸에 옮겨 붙일 수 없다.
+ * - 저장소가 유출돼도 VAULT_SECRET 없이는 읽을 수 없다. (서버 자체가 뚫리면 열릴 수 있음 — 개인정보처리방침에 밝힘)
+ * - 이용자가 "내 문서함 끄기"를 하면 보관된 열쇠를 모두 지우고 다시 넣지 않는다.
+ */
+const KEY_RE = /^[A-Za-z0-9_-]{43}$/;
+const FORMATS = ['hwp', 'hwpx', 'docx'];
+const ROLES = ['owner', 'editor', 'viewer'];
+const MAX_MYDOCS = 2000;
+async function vaultKey(env, email) {
+  if (!env.VAULT_SECRET || env.VAULT_SECRET.length < 32) throw new Error('VAULT_SECRET이 설정되지 않았습니다');
+  const base = await crypto.subtle.importKey('raw', enc.encode(env.VAULT_SECRET), 'HKDF', false, ['deriveKey']);
+  return crypto.subtle.deriveKey({ name: 'HKDF', hash: 'SHA-256', salt: enc.encode(`vault:${email}`), info: enc.encode('hangul-editor mydocs v1') },
+    base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+}
+async function myDocs(req, url, env, ses) {
+  const vault = env.VAULT.get(env.VAULT.idFromName(ses.email));
+  const vk = await vaultKey(env, ses.email);
+  const id = url.pathname.split('/')[3] || '';
+  if (url.pathname === '/api/mydocs' && req.method === 'GET') {
+    const st = await (await vault.fetch('https://vault/list')).json();
+    const docs = [];
+    for (const e of st.docs) {
+      try {
+        const raw = unb64u(e.enc);
+        const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: raw.subarray(0, 12), additionalData: enc.encode(e.id) }, vk, raw.subarray(12));
+        docs.push({ id: e.id, ...JSON.parse(new TextDecoder().decode(plain)), added: e.added, opened: e.opened });
+      } catch { /* 망가진 칸은 건너뛴다 */ }
+    }
+    docs.sort((a, b) => b.opened - a.opened);
+    return json({ enabled: st.enabled, docs });
+  }
+  if (url.pathname === '/api/mydocs/settings' && req.method === 'PUT') {
+    const body = await req.json().catch(() => ({}));
+    return vault.fetch('https://vault/settings', { method: 'PUT', body: JSON.stringify({ enabled: body.enabled !== false }) });
+  }
+  if (!ID_RE.test(id)) return json({ error: 'bad id' }, 400);
+  if (req.method === 'PUT') {
+    const body = await req.json().catch(() => ({}));
+    if (!KEY_RE.test(body.key || '') || !FORMATS.includes(body.format) || !ROLES.includes(body.role)) return json({ error: 'bad entry' }, 400);
+    const name = String(body.name || '').slice(0, 200);
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: enc.encode(id) }, vk,
+      enc.encode(JSON.stringify({ key: body.key, name, format: body.format, role: body.role }))));
+    const all = new Uint8Array(12 + ct.length); all.set(iv); all.set(ct, 12);
+    return vault.fetch('https://vault/put', { method: 'PUT', body: JSON.stringify({ id, enc: b64u(all) }) });
+  }
+  if (req.method === 'DELETE') return vault.fetch('https://vault/del', { method: 'DELETE', body: JSON.stringify({ id }) });
+  return json({ error: 'not found' }, 404);
+}
+
+export class Vault {
+  constructor(state) { this.state = state; }
+  async fetch(req) {
+    const path = new URL(req.url).pathname;
+    const enabled = (await this.state.storage.get('enabled')) !== false;
+    if (path === '/list') {
+      const map = await this.state.storage.list({ prefix: 'd:' });
+      return json({ enabled, docs: [...map.values()] });
+    }
+    if (path === '/settings') {
+      const { enabled: on } = await req.json();
+      await this.state.storage.put('enabled', on);
+      if (!on) { const map = await this.state.storage.list({ prefix: 'd:' }); await this.state.storage.delete([...map.keys()]); }
+      return json({ enabled: on });
+    }
+    if (path === '/put') {
+      if (!enabled) return json({ error: 'disabled', message: '내 문서함이 꺼져 있습니다' }, 409);
+      const { id, enc: e } = await req.json();
+      const prev = await this.state.storage.get(`d:${id}`);
+      if (!prev) {
+        const count = (await this.state.storage.list({ prefix: 'd:', limit: MAX_MYDOCS + 1 })).size;
+        if (count >= MAX_MYDOCS) return json({ error: 'full', message: '내 문서함이 가득 찼습니다' }, 409);
+      }
+      const now = Date.now();
+      await this.state.storage.put(`d:${id}`, { id, enc: e, added: prev ? prev.added : now, opened: now });
+      return json({ ok: true });
+    }
+    if (path === '/del') {
+      const { id } = await req.json();
+      await this.state.storage.delete(`d:${id}`);
+      return json({ ok: true });
+    }
+    return json({ error: 'not found' }, 404);
+  }
+}
+
 /* ---------- 진입점 ---------- */
 export default {
   async fetch(req, env) {
@@ -173,6 +261,10 @@ export default {
       if (url.pathname === '/api/auth/exchange' && req.method === 'POST') return withCors(await authExchange(req, env), h);
       const ses = await sessionOf(req, env);
       if (url.pathname === '/api/me') return ses ? json({ email: ses.email, name: ses.name }, 200, h) : json({ error: 'login' }, 401, h);
+      if (url.pathname === '/api/mydocs' || url.pathname.startsWith('/api/mydocs/')) {
+        if (!ses) return json({ error: 'login', message: '로그인해 주세요' }, 401, h);
+        return withCors(await myDocs(req, url, env, ses), h);
+      }
 
       const parts = url.pathname.split('/').filter(Boolean); // api, docs, :id, ...
       if (parts[1] !== 'docs') return json({ error: 'not found' }, 404, h);
@@ -282,7 +374,7 @@ export class DocRoom {
     const needEdit = () => (user
       ? json({ error: 'forbidden', message: '이 문서를 고칠 권한이 없습니다. 문서 주인에게 요청해 주세요' }, 403)
       : json({ error: 'login', message: '고치려면 로그인해 주세요' }, 401));
-    const lockInfo = (l) => (l ? { by: l.by, until: l.until } : null);
+    const lockInfo = (l) => (l ? { by: l.by, until: l.until, ...(user && l.user === user ? { mine: true } : {}) } : null);
 
     if (path.startsWith('v/') && req.method === 'GET') {
       const n = Number(path.slice(2));
@@ -305,10 +397,12 @@ export class DocRoom {
       const body = await req.json().catch(() => ({}));
       const by = String(body.by || '').slice(0, AUTHOR_MAX);
       const cur = await this.activeLock();
-      if (cur && cur.lockId !== body.lockId) return json({ error: 'locked', lock: lockInfo(cur) }, 409);
-      const lock = { lockId: cur ? cur.lockId : rand(16), by, user, until: now + Number(this.env.LOCK_SECONDS) * 1000 };
+      // 같은 계정이 다른 PC·창에서 잡고 있으면 넘겨받을 수 있다 (남의 잠금은 못 가져감)
+      const takeover = !!(cur && cur.lockId !== body.lockId && body.takeover === true && cur.user && cur.user === user);
+      if (cur && cur.lockId !== body.lockId && !takeover) return json({ error: 'locked', lock: lockInfo(cur) }, 409);
+      const lock = { lockId: cur && !takeover ? cur.lockId : rand(16), by, user, until: now + Number(this.env.LOCK_SECONDS) * 1000 };
       await this.state.storage.put('lock', lock);
-      if (!cur) this.broadcast({ type: 'lock', lock: lockInfo(lock) });
+      if (!cur || takeover) this.broadcast({ type: 'lock', lock: { by: lock.by, until: lock.until } });
       return json({ lockId: lock.lockId, until: lock.until });
     }
 

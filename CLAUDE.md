@@ -44,11 +44,15 @@
 `).
 
 ## 클라우드 (Cloudflare, 우리 서버)
-- 사용자 결정: 실시간 동시 타이핑은 하지 않는다. "한 명이 고치는 동안 나머지는 보기 + 버전 기록 + 공유 링크".
-- 서버: `cloud/` (Workers + Durable Objects + R2). `cloud/src/index.js` — 문서마다 DocRoom(고치기 권한 해시, 편집 잠금 90초·편집기가 30초마다 연장, 버전 목록 최근 30개, WebSocket 알림), 파일은 R2 `d/<id>/<n>`. IP별 하루 40개 만들기 제한(Limiter). 허용 출처는 `wrangler.toml`의 ALLOWED_ORIGINS.
-- 편집기: `src/cloud.js`. 문서·파일 이름·작성자 이름을 이 PC에서 AES-GCM으로 잠가 올린다. 열쇠는 링크 `#cloud=<id>.<열쇠>[.<고치기표식>]`에만 있다(서버는 내용을 볼 수 없음). 파일 탭 "클라우드" 묶음(클라우드에 저장·공유 링크·버전 기록·링크로 열기), 화면 아래 상태 줄. 웹판은 주소의 #으로 열고, 설치형은 "링크로 열기"(클립보드).
-- 개발: `cd cloud && npx wrangler dev --port 8787`(로컬 흉내, 계정 필요 없음) + 개발 서버(5173·5198·5199)면 자동으로 로컬 서버를 쓴다. 시험: `node cloud/test/api-test.mjs`.
-- 배포: Cloudflare 계정 → `npx wrangler login` → `npx wrangler r2 bucket create hangul-editor-docs` → `npx wrangler deploy` → 나온 주소를 `src/cloud.js`의 `PROD_API`에 적고 앱을 다시 빌드. 배포 전에 사용자에게 확인.
+- 사용자 결정: 실시간 동시 타이핑 없음. "한 명이 고치는 동안 나머지는 보기 + 버전 기록 + 공유 링크". 로그인은 Google(심사 없이, 로고 없이 게시 — Google 화면에는 앱 이름 대신 도메인이 보임). 비밀번호·보관함 비밀번호는 쓰지 않는다. 다른 사람에게 자동 공유(공유받은 문서함)는 보류.
+- 서버: `cloud/` (Workers + Durable Objects, 카드 없는 무료 요금제라 R2 대신 DO 저장소에 1MB 조각). 주소 https://hangul-editor-cloud.hangul-editor-cloud.workers.dev (홈 `/`, 개인정보처리방침 `/privacy` — `cloud/src/pages.js`).
+  - DocRoom: 주인·편집자(이메일), 편집 잠금 90초(편집기가 30초마다 연장, 같은 계정은 다른 PC에서 넘겨받기 가능), 버전 최근 20개, 최대 30MB, WebSocket 알림.
+  - 로그인: Google OIDC → PKCE 1회용 코드(2분) → 서명 세션(30일). 설치형은 브라우저 로그인 뒤 내장 서버 `/__auth`로 코드를 받는다.
+  - 내 문서함(Vault, 계정 이메일별): 문서 열쇠·이름을 HKDF(VAULT_SECRET, 이메일) AES-GCM으로 다시 잠가 보관 → 어느 PC에서나 "내 문서"로 연다. 끄면 열쇠를 모두 지운다(그때는 링크만, 서버도 못 엶). 개인정보처리방침에 한계(서버가 뚫리면 열릴 수 있음)를 밝혀 두었다.
+  - 비밀값(wrangler secret): GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, SESSION_SECRET, VAULT_SECRET. 로컬은 `cloud/.dev.vars`(DEV_LOGIN=1 가짜 로그인, git 제외).
+- 편집기: `src/cloud.js`. 문서·파일 이름·작성자 이름은 이 PC에서 AES-GCM으로 잠가 올린다. 링크 `#cloud=<id>.<열쇠>`. 파일 탭 "클라우드"(내 문서·클라우드에 저장·공유 링크·버전 기록·링크로 열기·계정), 화면 아래 상태 줄.
+- 개발: `cd cloud && npx wrangler dev --port 8787` + 개발 서버(5173·5198·5199)면 로컬 서버를 쓴다. 시험: `node cloud/test/api-test.mjs`(보안 시험 포함).
+- 배포: `cd cloud && npx wrangler deploy` (계정 gemisionkim@gmail.com, Google Cloud 프로젝트 hangle-aditor). 서버 배포는 git push와 별개.
 
 ## 명령
 - 개발 서버: `npm run dev`

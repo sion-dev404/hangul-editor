@@ -32,6 +32,7 @@ const RIBBON = [
     ] },
     { label: '원본 확인', big: [{ a: 'openInHangul', i: 'openhwp', l: '한글에서 열어 보기', desktopOnly: true }] },
     { label: '클라우드', big: [
+      { a: 'cloudMyDocs', i: 'mydocs', l: '내 문서' },
       { a: 'cloudSave', i: 'cloudup', l: '클라우드에 저장' },
       { a: 'cloudShare', i: 'share', l: '공유 링크' },
       { a: 'cloudVersions', i: 'history', l: '버전 기록' },
@@ -297,6 +298,7 @@ const ACTS = {
   cloudVersions: () => ctx.cloud.versions(),
   cloudOpen: () => ctx.cloud.openLink(),
   cloudAccount: () => ctx.cloud.account(),
+  cloudMyDocs: () => ctx.cloud.myDocs(),
 };
 
 // 클라우드에 올릴 지금 문서 (열린 형식 그대로)

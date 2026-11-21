@@ -3,6 +3,8 @@
 // - 링크: <웹판>#cloud=<문서id>.<열쇠>   (보기는 링크만 있으면, 고치기는 로그인 + 문서 주인이 지정한 사람만)
 // - 로그인: Google. 비밀번호는 우리 서버에 오지 않는다. 로그인 창에서 돌아온 1회용 코드는 이 편집기만 아는 비밀값(PKCE)과 함께여야 쓸 수 있다.
 // - 한 번에 한 사람만 고친다(편집 잠금, 30초마다 연장). 저장할 때마다 버전이 쌓이고, 보는 사람에게 알림이 간다.
+// - 내 문서함(기본 켜짐): 로그인하면 연·저장한 클라우드 문서의 열쇠를 서버 보관함에 둔다(서버 비밀키로 다시 잠금).
+//   어느 PC에서나 목록에서 바로 연다. 끄면 보관 열쇠를 모두 지우고 링크로만 연다(서버도 못 여는 최고 보안).
 
 const WEB_URL = 'https://sion-dev404.github.io/hangul-editor/';
 // 배포한 서버 주소 (wrangler deploy 뒤에 적는다). 개발 서버(5173·5198·5199)에서는 로컬 서버(wrangler dev)를 쓴다.
@@ -106,6 +108,7 @@ export async function login() {
 export async function logout() {
   if (s?.editing) await releaseLock();
   saveAuth(null);
+  vaultOn = true;
   if (s) { s.canEdit = false; s.isOwner = false; refreshBar(); }
   ctx.toast('로그아웃했습니다');
 }
@@ -201,6 +204,8 @@ function refreshBar() {
       { label: '클라우드에 저장', primary: true, run: () => saveToCloud() },
       { label: '공유', run: () => shareDialog() },
     ] });
+  } else if (s.canEdit && s.lockMine) {
+    showBar('다른 PC(또는 창)에서 내가 편집 중이에요', { ro: true, buttons: [{ label: '여기서 편집', primary: true, run: () => startEditing(true, true) }] });
   } else if (s.canEdit) {
     if (s.lockBy) showBar(`${s.lockBy}님이 편집 중입니다 · 지금은 보기만 할 수 있어요`, { ro: true, buttons: [{ label: '버전 기록', run: () => versionsDialog() }] });
     else showBar('클라우드 문서 · 지금 아무도 편집하지 않아요', { ro: true, buttons: [{ label: '편집 시작', primary: true, run: () => startEditing(true) }] });
@@ -242,9 +247,18 @@ export function accountDialog() {
     return;
   }
   const body = el(`<div class="me"><div><b>${esc(auth.user.name || '')}</b><br><small>${esc(auth.user.email)}</small></div><button class="btn sub" data-out>로그아웃</button></div>
+    <div class="sec"><div class="t">내 문서함 <small>${vaultOn ? '켜짐' : '꺼짐'}</small></div>
+      <div class="r"><div style="flex:1;color:#4a5363;font-size:12.5px">${vaultOn
+        ? '어느 PC에서나 로그인하면 내 클라우드 문서 목록이 보입니다. 문서 열쇠는 서버 비밀키로 다시 잠가 보관하므로 저장소가 유출돼도 읽을 수 없지만, 서버 자체가 뚫리면 열릴 수 있습니다(한컴독스·구글 문서와 같은 수준).'
+        : '꺼져 있어 문서 열쇠는 링크 안에만 있습니다. 서버도 문서를 열 수 없는 최고 보안이지만, 링크를 잃어버리면 다시 열 수 없습니다.'}</div>
+      <button class="btn sub" data-vault>${vaultOn ? '끄기' : '켜기'}</button></div></div>
     <div class="note">로그인은 30일 동안 유지됩니다. 공용 PC라면 다 쓴 뒤 꼭 로그아웃해 주세요.</div>`);
   const d = dialog('클라우드 계정', body);
   d.querySelector('[data-out]').addEventListener('click', async () => { d.close(); await logout(); });
+  d.querySelector('[data-vault]').addEventListener('click', async () => {
+    if (vaultOn && !confirm('내 문서함을 끄면 보관한 열쇠를 모두 지웁니다.\n다른 PC에서는 링크로만 열 수 있게 됩니다. 끌까요?')) return;
+    if (await setVault(!vaultOn)) { d.close(); accountDialog(); }
+  });
 }
 
 export async function shareDialog() {
@@ -258,7 +272,9 @@ export async function shareDialog() {
       <div class="chips"><span class="chip" style="background:#e6f4ec">${esc(auth.user.email)} (주인)</span></div>
       <div class="r" style="margin-top:8px"><input type="email" placeholder="함께 고칠 사람 이메일" data-email><button class="btn sub" data-add>추가</button></div></div>` : `
       <div class="sec"><div class="t">고치기</div>${s.canEdit ? '이 문서를 고칠 수 있어요.' : '고치려면 문서 주인이 내 이메일을 추가해야 해요.'}</div>`}
-    <div class="note">🔒 문서는 이 PC에서 잠가서 올립니다. 링크의 <b>#</b> 뒤가 열쇠라 서버도 내용을 볼 수 없어요. 링크를 잃어버리면 다시 열 수 없으니 잘 보관하세요.</div>`);
+    <div class="note">🔒 문서는 이 PC에서 잠가서 올립니다. ${vaultOn && auth
+      ? '열쇠는 링크와 <b>내 문서함</b>(서버 비밀키로 다시 잠가 보관)에 있어, 어느 PC에서나 "내 문서"에서 다시 열 수 있어요.'
+      : '열쇠는 링크의 <b>#</b> 뒤에만 있어 서버도 내용을 볼 수 없어요. 링크를 잃어버리면 다시 열 수 없으니 잘 보관하세요.'}</div>`);
   const d = dialog('공유', body);
   d.querySelector('[data-copy]').addEventListener('click', () => copy(linkOf()));
   d.querySelector('input[readonly]').addEventListener('focus', (e) => e.target.select());
@@ -334,6 +350,8 @@ async function refreshRights() {
   const info = await jsonOf(await call(`/api/docs/${s.id}`));
   s.canEdit = !!info.you?.canEdit; s.isOwner = !!info.you?.isOwner;
   s.lockBy = info.lock ? await openText(s.key, info.lock.by) : null;
+  s.lockMine = !!info.lock?.mine;
+  addToMyDocs();
   if (s.canEdit && !info.lock && !s.editing) { await startEditing(true); return; }
   refreshBar();
   // 보던 것보다 새 버전이 있으면 알린다 (로그인하는 사이 저장된 경우)
@@ -359,10 +377,12 @@ export async function openLink(text) {
     await loadVersion(last.n);
     s.canEdit = !!info.you?.canEdit; s.isOwner = !!info.you?.isOwner;
     s.lockBy = info.lock ? await openText(s.key, info.lock.by) : null;
+    s.lockMine = !!info.lock?.mine;
     connectLive();
     if (s.canEdit && !info.lock) await startEditing(false);
     setHash();
     refreshBar();
+    addToMyDocs();
     return true;
   } catch (e) {
     console.error(e);
@@ -389,7 +409,7 @@ export async function openFromClipboard() {
 }
 
 /* ---------- 편집 잠금 ---------- */
-async function startEditing(reloadLatest) {
+async function startEditing(reloadLatest, takeover = false) {
   if (!s?.canEdit) return false;
   try {
     if (reloadLatest) {
@@ -397,12 +417,12 @@ async function startEditing(reloadLatest) {
       const last = info.versions?.[info.versions.length - 1];
       if (last && last.n !== s.openedN) await loadVersion(last.n);
     }
-    const res = await call(`/api/docs/${s.id}/lock`, { method: 'POST', body: JSON.stringify({ by: await sealText(s.key, myName()) }) });
+    const res = await call(`/api/docs/${s.id}/lock`, { method: 'POST', body: JSON.stringify({ by: await sealText(s.key, myName()), takeover }) });
     const r = await jsonOf(res);
-    if (res.status === 409) { s.lockBy = await openText(s.key, r.lock?.by); s.editing = false; refreshBar(); return false; }
+    if (res.status === 409) { s.lockBy = await openText(s.key, r.lock?.by); s.lockMine = !!r.lock?.mine; s.editing = false; refreshBar(); return false; }
     if (res.status === 401 || res.status === 403) { s.canEdit = false; refreshBar(); ctx.toast(r.message || '고칠 권한이 없습니다'); return false; }
     if (!res.ok) throw new Error('편집 권한을 받지 못했습니다');
-    s.lockId = r.lockId; s.editing = true; s.lockBy = null;
+    s.lockId = r.lockId; s.editing = true; s.lockBy = null; s.lockMine = false;
     clearInterval(s.beat);
     s.beat = setInterval(() => renewLock().catch(() => {}), HEARTBEAT);
     refreshBar();
@@ -418,7 +438,7 @@ async function renewLock() {
     s.lockBy = r.lock ? await openText(s.key, r.lock.by) : null;
     refreshBar();
     showBar(res.status === 409
-      ? `연결이 끊긴 사이 ${s.lockBy}님이 편집을 시작했습니다. 내 변경은 다른 이름으로 따로 저장해 주세요`
+      ? (r.lock?.mine ? '다른 PC(또는 창)에서 편집을 넘겨받았습니다. 여기서 고친 내용은 다른 이름으로 따로 저장해 주세요' : `연결이 끊긴 사이 ${s.lockBy}님이 편집을 시작했습니다. 내 변경은 다른 이름으로 따로 저장해 주세요`)
       : '로그인이 끝나 편집이 멈췄습니다. 다시 로그인해 주세요', { ro: true, warn: true, buttons: res.status === 409 ? [] : [{ label: '로그인', primary: true, run: () => login() }] });
   }
 }
@@ -444,8 +464,9 @@ function connectLive() {
       const by = await openText(my.key, m.by);
       showBar(`${by}님이 새 버전(${m.n})을 저장했습니다`, { buttons: [{ label: '불러오기', primary: true, run: async () => { await loadVersion(m.n); refreshBar(); } }, { label: '나중에', run: () => refreshBar() }] });
     } else if (m.type === 'lock') {
-      if (my.editing) return;
+      if (my.editing) { if (m.lock) renewLock().catch(() => {}); return; }
       my.lockBy = m.lock ? await openText(my.key, m.lock.by) : null;
+      if (m.lock && my.canEdit) { try { const i2 = await jsonOf(await call(`/api/docs/${my.id}`)); my.lockMine = !!i2.lock?.mine; } catch { /* 무시 */ } } else my.lockMine = false;
       refreshBar();
       if (!m.lock && my.canEdit) {
         showBar('이제 편집할 수 있어요', { buttons: [{ label: '최신 버전 불러와 편집', primary: true, run: () => startEditing(true) }, { label: '나중에', run: () => refreshBar() }] });
@@ -457,6 +478,60 @@ function connectLive() {
   ws.onclose = () => { if (s === my && !my.leaving) setTimeout(() => { if (s === my) connectLive(); }, 5000); };
   clearInterval(my.ping);
   my.ping = setInterval(() => { try { ws.send('ping'); } catch { /* 무시 */ } }, 25000);
+}
+
+/* ---------- 내 문서함 ---------- */
+let vaultOn = true; // 서버 설정을 받아 오기 전까지는 켜짐으로 본다
+const ROLE_KO = { owner: '주인', editor: '편집', viewer: '보기' };
+async function addToMyDocs() {
+  if (!auth || !s || !vaultOn) return;
+  const role = s.isOwner ? 'owner' : s.canEdit ? 'editor' : 'viewer';
+  const nm = s.name || '';
+  const format = s.format || (/\.docx$/i.test(nm) ? 'docx' : /\.hwpx$/i.test(nm) ? 'hwpx' : 'hwp');
+  try {
+    const res = await call(`/api/mydocs/${s.id}`, { method: 'PUT', body: JSON.stringify({ key: s.keyStr, name: nm || '이름 없음', format, role }) });
+    if (res.status === 409) { const r2 = await jsonOf(res); if (r2.error === 'disabled') vaultOn = false; }
+  } catch { /* 다음에 다시 */ }
+}
+
+export async function myDocsDialog() {
+  if (!auth) { if (!(await login())) return; }
+  let st;
+  try { st = await jsonOf(await call('/api/mydocs')); } catch (e) { ctx.toast(e.message); return; }
+  if (!Array.isArray(st.docs)) { ctx.toast('내 문서를 불러오지 못했습니다'); return; }
+  vaultOn = st.enabled !== false;
+  const when = (x) => new Date(x).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const rows = st.docs.map((d) => `<tr><td>${esc(d.name)}</td><td>${esc(d.format.toUpperCase())}</td><td>${ROLE_KO[d.role] || ''}</td><td>${esc(when(d.opened))}</td>
+    <td class="acts"><button class="btn" data-open="${d.id}">열기</button> <button class="btn sub" data-drop="${d.id}" title="목록에서만 빼기 (문서는 그대로)">빼기</button>${d.role === 'owner' ? ` <button class="btn sub" data-del="${d.id}" title="클라우드에서 문서를 완전히 지우기">지우기</button>` : ''}</td></tr>`).join('');
+  const empty = '<tr><td colspan="5" style="color:#5b6575;padding:18px 6px">아직 없습니다. "클라우드에 저장"을 누르거나 받은 링크를 열면 여기에 쌓입니다.</td></tr>';
+  const body = el(vaultOn ? `<div>${esc(auth.user.email)} 계정의 클라우드 문서입니다. 어느 PC에서나 로그인하면 보입니다.</div>
+    <div class="list"><table><tr><th>이름</th><th>종류</th><th>내 역할</th><th>최근</th><th></th></tr>${rows || empty}</table></div>`
+    : '<div>내 문서함이 꺼져 있습니다. 클라우드 문서는 링크로만 열 수 있습니다.</div><div class="sec"><button class="btn" data-on>내 문서함 켜기</button></div>');
+  const d = dialog('내 클라우드 문서', body);
+  const find = (id) => st.docs.find((x) => x.id === id);
+  d.querySelectorAll('[data-open]').forEach((b) => b.addEventListener('click', () => { const x = find(b.dataset.open); d.close(); openLink(`#cloud=${x.id}.${x.key}`); }));
+  d.querySelectorAll('[data-drop]').forEach((b) => b.addEventListener('click', async () => {
+    await call(`/api/mydocs/${b.dataset.drop}`, { method: 'DELETE' }); d.close(); myDocsDialog();
+  }));
+  d.querySelectorAll('[data-del]').forEach((b) => b.addEventListener('click', async () => {
+    const x = find(b.dataset.del);
+    if (!confirm(`"${x.name}" 문서를 클라우드에서 완전히 지울까요?\n모든 버전이 지워지고, 공유한 링크로도 더는 열 수 없습니다. 되돌릴 수 없습니다.`)) return;
+    const res = await call(`/api/docs/${x.id}`, { method: 'DELETE' });
+    if (!res.ok && res.status !== 404) { ctx.toast((await jsonOf(res)).message || '지우지 못했습니다'); return; }
+    await call(`/api/mydocs/${x.id}`, { method: 'DELETE' });
+    if (s && s.id === x.id) await leave();
+    ctx.toast('문서를 지웠습니다'); d.close(); myDocsDialog();
+  }));
+  const on = d.querySelector('[data-on]');
+  if (on) on.addEventListener('click', async () => { await setVault(true); d.close(); myDocsDialog(); });
+}
+async function setVault(on) {
+  const res = await call('/api/mydocs/settings', { method: 'PUT', body: JSON.stringify({ enabled: on }) });
+  if (!res.ok) { ctx.toast('바꾸지 못했습니다'); return false; }
+  vaultOn = on;
+  if (on) await addToMyDocs();
+  ctx.toast(on ? '내 문서함을 켰습니다' : '내 문서함을 끄고 보관한 열쇠를 모두 지웠습니다');
+  return true;
 }
 
 /* ---------- 저장 ---------- */
@@ -503,6 +578,7 @@ export async function saveToCloud() {
     setHash();
     refreshBar();
     ctx.toast(`클라우드에 저장했습니다 (버전 ${r.n})`);
+    addToMyDocs();
     if (fresh) shareDialog();
   } catch (e) {
     console.error(e);

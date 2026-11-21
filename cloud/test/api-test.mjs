@@ -92,6 +92,41 @@ ok(kinds === 'lock:A version1 lock:풀림 lock:B version2 version3', `실시간 
 
 ok((await req(D, { method: 'DELETE' }, A.token)).status === 200, 'A(주인) 문서 지우기');
 ok((await req(D)).status === 404 && (await req(D + '/v/1')).status === 404, '지운 뒤 정보·파일 없음');
+
+// ---- 내 문서함 ----
+const K = 'k'.repeat(43);
+ok((await req('/api/mydocs')).status === 401, '로그인 없이 내 문서함 거절');
+ok((await req('/api/mydocs/' + 'x'.repeat(22), { method: 'PUT', body: JSON.stringify({ key: 'short', name: 'a', format: 'hwp', role: 'owner' }) }, A.token)).status === 400, '잘못된 열쇠 형식 거절');
+const put1 = await req('/api/mydocs/' + 'a'.repeat(22), { method: 'PUT', body: JSON.stringify({ key: K, name: '과학 보고서.hwp', format: 'hwp', role: 'owner' }) }, A.token);
+ok(put1.status === 200, 'A 내 문서함에 넣기');
+await req('/api/mydocs/' + 'b'.repeat(22), { method: 'PUT', body: JSON.stringify({ key: K, name: '회의록.docx', format: 'docx', role: 'editor' }) }, A.token);
+const listA = await (await req('/api/mydocs', {}, A.token)).json();
+ok(listA.enabled === true && listA.docs.length === 2 && listA.docs.some((d) => d.name === '과학 보고서.hwp' && d.key === K), `A 목록: ${listA.docs.map((d) => d.name).join(', ')}`);
+const listC = await (await req('/api/mydocs', {}, C.token)).json();
+ok(listC.docs.length === 0, '다른 사람(C)에게는 A의 목록이 안 보임');
+await req('/api/mydocs/' + 'b'.repeat(22), { method: 'DELETE' }, A.token);
+ok((await (await req('/api/mydocs', {}, A.token)).json()).docs.length === 1, 'A 목록에서 빼기');
+const off = await (await req('/api/mydocs/settings', { method: 'PUT', body: JSON.stringify({ enabled: false }) }, A.token)).json();
+const afterOff = await (await req('/api/mydocs', {}, A.token)).json();
+ok(off.enabled === false && afterOff.docs.length === 0, '내 문서함 끄기 → 보관 열쇠 모두 지움');
+ok((await req('/api/mydocs/' + 'a'.repeat(22), { method: 'PUT', body: JSON.stringify({ key: K, name: 'x', format: 'hwp', role: 'owner' }) }, A.token)).status === 409, '끈 동안에는 넣기 거절');
+await req('/api/mydocs/settings', { method: 'PUT', body: JSON.stringify({ enabled: true }) }, A.token);
+
+// ---- 같은 계정 편집 넘겨받기 ----
+const c2 = await (await req('/api/docs', { method: 'POST' }, A.token)).json();
+const D2 = '/api/docs/' + c2.id;
+await req(D2 + '/editors', { method: 'PUT', body: JSON.stringify({ editors: ['b@test.kr'] }) }, A.token);
+const la = await (await req(D2 + '/lock', { method: 'POST', body: JSON.stringify({ by: 'A' }) }, A.token)).json();
+const A2 = await login('a@test.kr');
+const infoA2 = await (await req(D2, {}, A2.token)).json();
+ok(infoA2.lock && infoA2.lock.mine === true, '다른 PC의 같은 계정: "내 잠금"으로 보임');
+const infoB2 = await (await req(D2, {}, B.token)).json();
+ok(infoB2.lock && !infoB2.lock.mine, '다른 사람(B)에게는 "내 잠금" 표시 없음');
+ok((await req(D2 + '/lock', { method: 'POST', body: JSON.stringify({ by: 'B', takeover: true }) }, B.token)).status === 409, '다른 사람(B)은 넘겨받기 불가');
+const lt = await (await req(D2 + '/lock', { method: 'POST', body: JSON.stringify({ by: 'A2', takeover: true }) }, A2.token)).json();
+ok(!!lt.lockId && lt.lockId !== la.lockId, '같은 계정(다른 PC)은 넘겨받기 가능');
+ok((await req(D2 + '/lock', { method: 'POST', body: JSON.stringify({ by: 'A', lockId: la.lockId }) }, A.token)).status === 409, '넘겨준 쪽(PC1)의 잠금 연장은 거절');
+await req(D2, { method: 'DELETE' }, A.token);
 ws.close();
 console.log(fail ? `\n실패 ${fail}개` : '\n모두 통과');
 process.exit(fail ? 1 : 0);
