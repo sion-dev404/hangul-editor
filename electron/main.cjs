@@ -89,6 +89,25 @@ if (!app.requestSingleInstanceLock()) {
   });
 
   app.on('window-all-closed', () => app.quit());
+
+  // 한글 화면(rhwp)은 고친 내용이 있으면 beforeunload로 닫기를 막는다.
+  // 브라우저는 확인 창을 띄우지만 Electron은 말없이 닫기를 취소하므로, 여기서 직접 묻는다.
+  app.on('web-contents-created', (_e, wc) => {
+    wc.on('will-prevent-unload', (ev) => {
+      const owner = BrowserWindow.fromWebContents(wc) || win;
+      const choice = dialog.showMessageBoxSync(owner, {
+        type: 'question',
+        buttons: ['닫기', '취소'],
+        defaultId: 1,
+        cancelId: 1,
+        noLink: true,
+        title: '한글 편집기',
+        message: '저장하지 않은 내용이 있습니다.',
+        detail: '닫으면 저장하지 않은 내용은 파일에 반영되지 않습니다.\n(자동 복구에 보관된 내용은 다음 실행 때 되살릴 수 있습니다.)',
+      });
+      if (choice === 0) ev.preventDefault(); // 막기를 무시하고 닫는다
+    });
+  });
 }
 
 ipcMain.handle('initial-file', () => {
