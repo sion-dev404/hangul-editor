@@ -23,6 +23,8 @@
 //   DELETE /api/docs/:id                문서 지우기 (주인)
 //   GET    /api/docs/:id/live           WebSocket: {type:'version'|'lock'|'deleted', ...}
 
+import { homePage, privacyPage } from './pages.js';
+
 const ID_RE = /^[A-Za-z0-9_-]{22}$/;
 const AUTHOR_MAX = 600;
 const SESSION_DAYS = 30;
@@ -162,7 +164,9 @@ export default {
     try {
       if (url.pathname === '/auth/google/start' || url.pathname === '/auth/dev/start') return await authStart(url, env);
       if (url.pathname === '/auth/google/callback') return await authCallback(url, env);
-      if (!url.pathname.startsWith('/api/')) return new Response('한글 편집기 클라우드', { headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
+      if (url.pathname === '/' || url.pathname === '/index.html') return new Response(homePage(), { headers: { ...SEC_HEADERS, 'Cache-Control': 'public, max-age=600' } });
+      if (url.pathname === '/privacy') return new Response(privacyPage(), { headers: { ...SEC_HEADERS, 'Cache-Control': 'public, max-age=600' } });
+      if (!url.pathname.startsWith('/api/')) return new Response('찾는 페이지가 없습니다', { status: 404, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
       // 허용된 편집기 화면에서만 쓴다
       if (!('Access-Control-Allow-Origin' in h)) return json({ error: 'origin' }, 403, h);
 
