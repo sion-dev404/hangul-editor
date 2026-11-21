@@ -6,7 +6,7 @@
 
 const WEB_URL = 'https://sion-dev404.github.io/hangul-editor/';
 // 배포한 서버 주소 (wrangler deploy 뒤에 적는다). 개발 서버(5173·5198·5199)에서는 로컬 서버(wrangler dev)를 쓴다.
-const PROD_API = '';
+const PROD_API = 'https://hangul-editor-cloud.hangul-editor-cloud.workers.dev';
 const DEV = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) && ['5173', '5198', '5199'].includes(location.port);
 const API = DEV ? 'http://127.0.0.1:8787' : PROD_API;
 
