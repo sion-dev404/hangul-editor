@@ -31,6 +31,12 @@ const RIBBON = [
       { c: 'file:print', i: 'print', l: '인쇄' },
     ] },
     { label: '원본 확인', big: [{ a: 'openInHangul', i: 'openhwp', l: '한글에서 열어 보기', desktopOnly: true }] },
+    { label: '클라우드', big: [
+      { a: 'cloudSave', i: 'cloudup', l: '클라우드에 저장' },
+      { a: 'cloudShare', i: 'share', l: '공유 링크' },
+      { a: 'cloudVersions', i: 'history', l: '버전 기록' },
+      { a: 'cloudOpen', i: 'cloudopen', l: '링크로 열기' },
+    ] },
     { label: '정보', big: [{ a: 'fontCredits', i: 'style', l: '글꼴 출처' }] },
   ] },
   { id: 'home', label: '편집', groups: [
@@ -285,9 +291,28 @@ const ACTS = {
   saveDocx,
   openInHangul,
   fontCredits: () => ctx.fontCredits?.(),
+  cloudSave: () => ctx.cloud.save(),
+  cloudShare: () => ctx.cloud.share(),
+  cloudVersions: () => ctx.cloud.versions(),
+  cloudOpen: () => ctx.cloud.openLink(),
 };
 
+// 클라우드에 올릴 지금 문서 (열린 형식 그대로)
+export async function currentDoc() {
+  const s = await ensureStudio();
+  const format = cur.format === 'hwpx' ? 'hwpx' : 'hwp';
+  const bytes = format === 'hwpx' ? await s.exportHwpx() : await s.exportHwp();
+  return { bytes, name: `${ctx.getName()}.${format}`, format };
+}
+// 클라우드에 저장한 뒤: "저장 안 한 내용" 표시와 자동 복구 보관본을 지운다
+export async function markSavedCloud() {
+  try { await studio?.notifySaved(`${ctx.getName()}.${cur.format === 'hwpx' ? 'hwpx' : 'hwp'}`); } catch { /* 무시 */ }
+  await delRecovery(REC);
+  ctx.setSaveState?.(`클라우드 저장 ${clock()}`);
+}
+
 export async function newDocument() {
+  await ctx.cloud?.leave();
   ctx.setMode('hwp');
   try {
     const s = await ensureStudio();

@@ -1,0 +1,29 @@
+# 한글 편집기 클라우드 (Cloudflare Workers + Durable Objects + R2)
+name = "hangul-editor-cloud"
+main = "src/index.js"
+compatibility_date = "2025-09-01"
+
+[[r2_buckets]]
+binding = "DOCS"
+bucket_name = "hangul-editor-docs"
+
+[[durable_objects.bindings]]
+name = "ROOM"
+class_name = "DocRoom"
+
+[[durable_objects.bindings]]
+name = "LIMIT"
+class_name = "Limiter"
+
+# 무료 요금제는 SQLite 저장소를 쓰는 Durable Object만 된다
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["DocRoom", "Limiter"]
+
+[vars]
+# 이 주소에서 연 편집기만 서버를 쓸 수 있다 (웹판, 설치형 내장 서버, 개발 서버)
+ALLOWED_ORIGINS = "https://sion-dev404.github.io,http://127.0.0.1:47615,http://localhost:5173,http://localhost:5199,http://localhost:5198"
+MAX_BYTES = "52428800"      # 문서 하나 최대 50MB (암호화된 크기)
+KEEP_VERSIONS = "30"        # 문서마다 남기는 버전 수
+CREATES_PER_DAY = "40"      # 접속 주소(IP) 하나가 하루에 만들 수 있는 문서 수
+LOCK_SECONDS = "90"         # 편집 잠금 유지 시간 (편집기가 30초마다 연장)

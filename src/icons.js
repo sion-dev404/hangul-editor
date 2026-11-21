@@ -51,6 +51,11 @@ export const ICONS = {
   undo: svg(`<path d="M10 11H20a6 6 0 010 12H12"/><path d="M14 6l-5 5 5 5"/>`),
   redo: svg(`<path d="M22 11H12a6 6 0 000 12H20"/><path d="M18 6l5 5-5 5"/>`),
   openhwp: svg(`<circle cx="14" cy="14" r="8" fill="${L}"/><path d="M20 20l8 8"/><text x="9.5" y="17.5" font-size="9" font-weight="700" fill="${A}" stroke="none" font-family="sans-serif">한</text>`),
+  // 클라우드
+  cloudup: svg(`<path d="M9 24h15a5 5 0 0 0 .6-10A7.5 7.5 0 0 0 10 12.5 5.8 5.8 0 0 0 9 24z" fill="${L}"/><path d="M16 27V16M12 19.5l4-4 4 4" stroke="${A}"/>`),
+  cloudopen: svg(`<path d="M9 22h15a5 5 0 0 0 .6-10A7.5 7.5 0 0 0 10 10.5 5.8 5.8 0 0 0 9 22z" fill="${L}"/><path d="M13.5 26.5l-1.2 1.2a3 3 0 0 1-4.2-4.2l2.4-2.4a3 3 0 0 1 4.2 0M18.5 22.5l1.2-1.2a3 3 0 0 1 4.2 4.2l-2.4 2.4a3 3 0 0 1-4.2 0" stroke="${A}"/>`),
+  share: svg(`<circle cx="23" cy="8" r="3.5" fill="${L}"/><circle cx="9" cy="16" r="3.5" fill="${L}"/><circle cx="23" cy="24" r="3.5" fill="${L}"/><path d="M12 14.3l8-4.6M12 17.7l8 4.6" stroke="${A}"/>`),
+  history: svg(`<circle cx="17" cy="16" r="10" fill="${L}"/><path d="M17 10v6l4 3"/><path d="M5 11l2 5 4.5-2.5" stroke="${A}"/>`),
 };
 
 // 이름이면 아이콘, 아니면(기호 문자) 그대로 돌려준다

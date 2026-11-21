@@ -1,5 +1,6 @@
 import './style.css';
-import { initHwp, openHwp, showHwp, newDocument as newHwpDocument, offerRecovery } from './hwp-mode.js';
+import { initHwp, openHwp, showHwp, newDocument as newHwpDocument, offerRecovery, currentDoc as hwpCurrentDoc, markSavedCloud as hwpMarkSavedCloud } from './hwp-mode.js';
+import * as cloud from './cloud.js';
 import { icon } from './icons.js';
 import { putRecovery, getRecovery, clock } from './recovery.js';
 import { loadFontPack, injectFontCss, addKoglGroup } from './fonts.js';
@@ -803,6 +804,7 @@ function pickFile() {
 }
 
 function newDocx() {
+  cloud.leave();
   setMode('docx');
   if (editor.innerText.trim() && !confirm('지금 워드 문서를 지우고 새 문서를 만들까요?')) return;
   setContent(''); $('#docName').value = '새 문서'; savedRange = null;
@@ -810,7 +812,24 @@ function newDocx() {
   applyPage(); flush();
 }
 
+
+// 클라우드: 지금 문서를 바이트로, 받은 문서 열기
+const cloudCtx = {
+  async getDoc() {
+    if (document.body.dataset.mode === 'hwp') return hwpCurrentDoc();
+    const blob = await buildDocx();
+    return { bytes: new Uint8Array(await blob.arrayBuffer()), name: `${docName()}.docx`, format: 'docx' };
+  },
+  async openBytes(bytes, name) { await openFile(new File([bytes], name)); },
+  async markSaved() { if (document.body.dataset.mode === 'hwp') await hwpMarkSavedCloud(); else $('#saveState').textContent = '클라우드 저장됨'; },
+  cloud: {
+    save: () => cloud.saveToCloud(), share: () => cloud.shareDialog(), versions: () => cloud.versionsDialog(),
+    openLink: () => cloud.openFromClipboard(), leave: () => cloud.leave(),
+  },
+};
+
 async function openFile(file, filePath) {
+  await cloud.leave(); // 클라우드 문서를 받는 중이면 그대로 둔다
   toast('문서를 여는 중…');
   try {
     const buf = await file.arrayBuffer();
@@ -901,6 +920,10 @@ const actions = {
     }
   },
   fontCredits() { openFontCredits(); },
+  cloudSave() { cloud.saveToCloud(); },
+  cloudShare() { cloud.shareDialog(); },
+  cloudVersions() { cloud.versionsDialog(); },
+  cloudOpen() { cloud.openFromClipboard(); },
   hf() { openHF(false); },
   hfNum() { openHF(true); },
   hfClose() { $('#hfDlg').hidden = true; },
@@ -1033,7 +1056,9 @@ function init() {
     setName: (n) => { $('#docName').value = n; },
     setSaveState: (t) => { $('#saveState').textContent = t; },
     fontCredits: openFontCredits,
+    cloud: cloudCtx.cloud,
   });
+  cloud.initCloud({ ...cloudCtx, toast, desktop });
 
   // 설치형(.exe) 전용 기능
   let startedWithFile = false;

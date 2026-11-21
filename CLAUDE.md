@@ -43,6 +43,13 @@
 - C# 소스는 C# 5 문법만 된다(`?.`, `$""` 안 됨). 문자열 안에 진짜 줄바꿈을 넣지 말 것(`
 `).
 
+## 클라우드 (Cloudflare, 우리 서버)
+- 사용자 결정: 실시간 동시 타이핑은 하지 않는다. "한 명이 고치는 동안 나머지는 보기 + 버전 기록 + 공유 링크".
+- 서버: `cloud/` (Workers + Durable Objects + R2). `cloud/src/index.js` — 문서마다 DocRoom(고치기 권한 해시, 편집 잠금 90초·편집기가 30초마다 연장, 버전 목록 최근 30개, WebSocket 알림), 파일은 R2 `d/<id>/<n>`. IP별 하루 40개 만들기 제한(Limiter). 허용 출처는 `wrangler.toml`의 ALLOWED_ORIGINS.
+- 편집기: `src/cloud.js`. 문서·파일 이름·작성자 이름을 이 PC에서 AES-GCM으로 잠가 올린다. 열쇠는 링크 `#cloud=<id>.<열쇠>[.<고치기표식>]`에만 있다(서버는 내용을 볼 수 없음). 파일 탭 "클라우드" 묶음(클라우드에 저장·공유 링크·버전 기록·링크로 열기), 화면 아래 상태 줄. 웹판은 주소의 #으로 열고, 설치형은 "링크로 열기"(클립보드).
+- 개발: `cd cloud && npx wrangler dev --port 8787`(로컬 흉내, 계정 필요 없음) + 개발 서버(5173·5198·5199)면 자동으로 로컬 서버를 쓴다. 시험: `node cloud/test/api-test.mjs`.
+- 배포: Cloudflare 계정 → `npx wrangler login` → `npx wrangler r2 bucket create hangul-editor-docs` → `npx wrangler deploy` → 나온 주소를 `src/cloud.js`의 `PROD_API`에 적고 앱을 다시 빌드. 배포 전에 사용자에게 확인.
+
 ## 명령
 - 개발 서버: `npm run dev`
 - 설치 파일: `npm run dist` → `release/HangulEditor-Setup-<버전>.exe` (설치 화면만 다시 만들 때: `npm run setup`, 화면 그림만 뽑기: `node tools/make-setup.mjs --snap=<폴더>`)
