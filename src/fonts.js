@@ -39,3 +39,19 @@ export function findFonts(pack, families) {
   const want = new Set([...families].map((s) => String(s).trim().toLowerCase()));
   return pack.fonts.filter((f) => f.aliases.some((a) => want.has(a.toLowerCase())));
 }
+
+// 공공누리 글꼴 묶음(optgroup)을 글꼴 상자 맨 아래에 붙인다 (워드 화면 기본 상자 모양 그대로)
+export function addKoglGroup(select, pack) {
+  if (!select || !pack || select.querySelector('optgroup[data-kogl]')) return;
+  const doc = select.ownerDocument;
+  const g = doc.createElement('optgroup');
+  g.dataset.kogl = '1';
+  const fams = [...new Set(pack.fonts.map((f) => f.family))].sort((a, b) => a.localeCompare(b, 'ko'));
+  g.label = `공공누리 글꼴 (${fams.length})`;
+  for (const fam of fams) {
+    const o = doc.createElement('option');
+    o.value = fam; o.textContent = fam;
+    g.append(o);
+  }
+  select.append(g);
+}

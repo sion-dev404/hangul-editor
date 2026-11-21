@@ -2,8 +2,7 @@ import './style.css';
 import { initHwp, openHwp, showHwp, newDocument as newHwpDocument, offerRecovery } from './hwp-mode.js';
 import { icon } from './icons.js';
 import { putRecovery, getRecovery, clock } from './recovery.js';
-import { loadFontPack, injectFontCss } from './fonts.js';
-import { addKoglGroup, attachFontPicker } from './fontpicker.js';
+import { loadFontPack, injectFontCss, addKoglGroup } from './fonts.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -948,7 +947,6 @@ function init() {
       injectFontCss(document, pack);
       addKoglGroup($('#fontSel'), pack);
     }
-    attachFontPicker($('#fontSel'), pack); // 공공누리 표시가 붙는 글꼴 목록
   });
   $('#popColor').innerHTML = `<div class="swatches">${COLORS.map((c) => `<button data-color="${c}" style="background:${c}" title="${c}"></button>`).join('')}</div>`;
   $('#popHilite').innerHTML = `<div class="swatches">${HILITES.map((c) => `<button data-hilite="${c}" style="background:${c === 'transparent' ? '#fff' : c}">${c === 'transparent' ? '없음' : ''}</button>`).join('')}</div>`;
