@@ -44,7 +44,8 @@
 `).
 
 ## 클라우드 (Cloudflare, 우리 서버)
-- 사용자 결정: 실시간 동시 타이핑 없음. "한 명이 고치는 동안 나머지는 보기 + 버전 기록 + 공유 링크". 로그인은 Google(심사 없이, 로고 없이 게시 — Google 화면에는 앱 이름 대신 도메인이 보임). 비밀번호·보관함 비밀번호는 쓰지 않는다. 다른 사람에게 자동 공유(공유받은 문서함)는 보류.
+- 사용자 결정(2026-11-21): "공유받은 문서함"(편집자 자동 공유)은 실효성 없음으로 **파기**. 최우선 목표는 자체 엔진 **swpro**.
+- 사용자 결정: 실시간 동시 타이핑 없음. "한 명이 고치는 동안 나머지는 보기 + 버전 기록 + 공유 링크". 로그인은 Google(심사 없이, 로고 없이 게시 — Google 화면에는 앱 이름 대신 도메인이 보임). 비밀번호·보관함 비밀번호는 쓰지 않는다. 다른 사람에게 자동 공유(공유받은 문서함)는 파기.
 - 서버: `cloud/` (Workers + Durable Objects, 카드 없는 무료 요금제라 R2 대신 DO 저장소에 1MB 조각). 주소 https://hangul-editor-cloud.hangul-editor-cloud.workers.dev (홈 `/`, 개인정보처리방침 `/privacy` — `cloud/src/pages.js`).
   - DocRoom: 주인·편집자(이메일), 편집 잠금 90초(편집기가 30초마다 연장, 같은 계정은 다른 PC에서 넘겨받기 가능), 버전 최근 20개, 최대 30MB, WebSocket 알림.
   - 로그인: Google OIDC → PKCE 1회용 코드(2분) → 서명 세션(30일). 설치형은 브라우저 로그인 뒤 내장 서버 `/__auth`로 코드를 받는다.
@@ -77,5 +78,6 @@
   - Rust 1.93.1 `x86_64-pc-windows-gnu` + `wasm32-unknown-unknown`, `wasm32-wasip1` 타깃.
   - 툴체인의 `llvm-ar.exe`를 `llvm-dlltool.exe`로 복사하고 `-C dlltool=`로 지정(빌드 스크립트 링크용).
   - `wasm-bindgen` CLI 대신 `tools/wb-wasi`(wasm-bindgen-cli-support를 WASI로 빌드)를 Node로 실행.
+- **엔진 소스 위치: `C:\Users\redsi\swpro\rhwp-src`** (git으로 기록, 출발점 커밋 = rhwp 0.9.0 + 위 수정). 빌드 도구 `C:\Users\redsi\swpro\wb-wasi`, `C:\Users\redsi\swpro\build-engine.ps1`(이 폴더 기준으로 동작). swpro(자체 엔진)는 이 소스에서 단계적으로 키운다.
 - 순서: `tools/build-engine.ps1`(엔진 → `pkg-new/`) → `pkg/`와 `rhwp-studio/public/rhwp.js`에 복사 → `rhwp-studio`에서 `RHWP_WITHOUT_AI=1 npx vite build --base=./` → `tools/install-studio.ps1 -Studio <rhwp-studio 경로>`(엔진 파일 이름을 `rhwp_bg.wasm`으로 고정해 화면 쪽과 같이 쓴다).
 - 빌드 한 번에 약 8~10분 걸린다. 배치 결과는 `tools/engine-check.mjs`로 Node에서 바로 확인한다(`all` 명령으로 수정 전후 비교).
