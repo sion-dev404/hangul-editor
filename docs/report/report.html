@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>한글 편집기 개발 계획 보고서</title>
+<style>
+  @page { size: A4; margin: 18mm 17mm 18mm 17mm; }
+  :root {
+    --ink: #1d2430; --sub: #5b6575; --line: #d9dee6; --soft: #f3f5f8;
+    --blue: #2f6fd6; --blue-soft: #e8f0fc; --green: #1f8a4c; --green-soft: #e6f4ec;
+    --amber: #b7740a; --amber-soft: #fdf3e1; --gray-soft: #eef0f3;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: #fff; }
+  body {
+    font-family: "Malgun Gothic", "맑은 고딕", sans-serif;
+    color: var(--ink); font-size: 10.2pt; line-height: 1.62;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+    word-break: keep-all; overflow-wrap: break-word;
+  }
+  h1, h2, h3 { line-height: 1.3; margin: 0; }
+  p { margin: 0 0 6px; }
+  ul { margin: 4px 0 8px; padding-left: 18px; }
+  li { margin: 2px 0; }
+  .muted { color: var(--sub); }
+
+  /* 표지 머리 */
+  .cover { border-bottom: 2px solid var(--ink); padding-bottom: 14px; margin-bottom: 18px; }
+  .cover .kicker { font-size: 9pt; letter-spacing: .08em; color: var(--blue); font-weight: 700; }
+  .cover h1 { font-size: 22pt; margin: 6px 0 6px; }
+  .cover .lead { font-size: 11pt; color: var(--sub); margin: 0; }
+  .meta { display: flex; gap: 22px; margin-top: 12px; font-size: 9pt; color: var(--sub); }
+  .meta b { color: var(--ink); font-weight: 700; margin-left: 4px; }
+
+  /* 요약 상자 */
+  .summary { background: var(--soft); border-radius: 8px; padding: 14px 16px; margin-bottom: 18px; }
+  .summary h3 { font-size: 10.5pt; margin-bottom: 6px; }
+  .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 10px; }
+  .kpi { background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; }
+  .kpi .v { font-size: 15pt; font-weight: 700; line-height: 1.2; }
+  .kpi .l { font-size: 8.5pt; color: var(--sub); }
+
+  section { margin-bottom: 18px; }
+  h2 { font-size: 13pt; padding-bottom: 5px; border-bottom: 1px solid var(--line); margin-bottom: 10px; }
+  h2 .n { color: var(--blue); margin-right: 6px; }
+  h3 { font-size: 10.5pt; margin: 10px 0 4px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 9.4pt; margin: 4px 0 8px; }
+  th, td { border-bottom: 1px solid var(--line); padding: 6px 8px; text-align: left; vertical-align: top; }
+  th { background: var(--gray-soft); font-weight: 700; border-bottom: 1px solid #c8ced8; }
+  td.c, th.c { text-align: center; }
+  tr { break-inside: avoid; }
+
+  .tag { display: inline-block; font-size: 8pt; font-weight: 700; padding: 1px 7px; border-radius: 10px; white-space: nowrap; }
+  .t-done { background: var(--green-soft); color: var(--green); }
+  .t-next { background: var(--blue-soft); color: var(--blue); }
+  .t-opt  { background: var(--gray-soft); color: var(--sub); }
+  .t-part { background: var(--amber-soft); color: var(--amber); }
+
+  /* 진행 막대 */
+  .bar { height: 12px; background: var(--gray-soft); border-radius: 6px; overflow: hidden; margin: 6px 0 4px; }
+  .bar > i { display: block; height: 100%; width: 70%; background: var(--blue); }
+  .bar-legend { display: flex; justify-content: space-between; font-size: 8.5pt; color: var(--sub); }
+
+  /* 로드맵 */
+  .road { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 8px 0 10px; }
+  .step { border: 1px solid var(--line); border-radius: 6px; padding: 8px 9px; font-size: 8.8pt; line-height: 1.45; break-inside: avoid; }
+  .step .s { font-size: 8pt; font-weight: 700; color: var(--blue); }
+  .step b { display: block; font-size: 9.6pt; margin: 2px 0 3px; }
+  .step.done { background: var(--green-soft); border-color: #bfe2cd; }
+  .step.done .s { color: var(--green); }
+  .step.opt { border-style: dashed; }
+  .step.opt .s { color: var(--sub); }
+
+  .note { border-left: 3px solid var(--blue); background: var(--blue-soft); padding: 8px 12px; border-radius: 0 6px 6px 0; font-size: 9.4pt; margin: 8px 0; }
+  .pb { break-before: page; }
+  .avoid { break-inside: avoid; }
+  footer { margin-top: 20px; padding-top: 8px; border-top: 1px solid var(--line); font-size: 8.5pt; color: var(--sub); }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <div class="kicker">개발 계획 보고서</div>
+  <h1>한글 편집기</h1>
+  <p class="lead">한컴오피스·MS 오피스 없이 한글(HWP/HWPX)과 워드(DOCX) 문서를<br>한 프로그램에서 열고, 고치고, 서로 변환하는 무료 문서 편집기</p>
+  <div class="meta">
+    <span>작성일<b>2026년 11월 21일</b></span>
+    <span>현재 버전<b>v2.5.0</b></span>
+    <span>배포 형태<b>설치형(Windows) · 웹</b></span>
+  </div>
+</div>
+
+<div class="summary avoid">
+  <h3>한눈에 보기</h3>
+  <p>핵심 편집 기능, 한글↔워드 변환, 화면 구성, 자동 복구, 글꼴 175종 탑재까지 완료했습니다. 남은 일은 <b>한글 화면의 글꼴 표시</b>, <b>공유 폴더를 이용한 문서 공유</b>, <b>변환 정확도 마무리</b>, <b>공개 배포</b>입니다. 별도 서버 없이 운영하는 구조라 운영 비용은 0원입니다.</p>
+  <div class="kpis">
+    <div class="kpi"><div class="v">약 70%</div><div class="l">전체 진행률(배포까지)</div></div>
+    <div class="kpi"><div class="v">2종</div><div class="l">지원 문서 형식(한글·워드)</div></div>
+    <div class="kpi"><div class="v">175종</div><div class="l">기본 탑재 무료 글꼴</div></div>
+    <div class="kpi"><div class="v">0원</div><div class="l">서버 운영 비용</div></div>
+  </div>
+</div>
+
+<section>
+  <h2><span class="n">1</span>개요</h2>
+  <h3>만드는 이유</h3>
+  <ul>
+    <li>공공기관·학교 문서는 대부분 한글(HWP) 형식이고, 회사·해외 문서는 워드(DOCX) 형식입니다. 두 형식을 함께 다루려면 유료 프로그램 두 개가 필요합니다.</li>
+    <li>한글 프로그램이 없는 PC에서는 HWP 문서를 제대로 열거나 고치기 어렵고, 워드로 바꾸려면 다른 사람에게 부탁해야 합니다.</li>
+  </ul>
+  <h3>목표</h3>
+  <ul>
+    <li><b>하나의 프로그램</b>으로 한글·워드 문서를 모두 열고 고치고 저장합니다.</li>
+    <li>한컴·MS 프로그램이 <b>설치되어 있지 않은 PC에서도</b> 서로 변환합니다.</li>
+    <li>한글 프로그램과 비슷한 익숙한 화면으로, 마우스(클릭·터치)만으로 쉽게 씁니다.</li>
+    <li>무료로 배포합니다. 설치형(Windows)과 웹판(브라우저) 두 가지로 제공합니다.</li>
+  </ul>
+  <h3>기술 바탕</h3>
+  <p>한글 문서 처리는 오픈소스 엔진 <b>rhwp</b>(MIT 라이선스, 수정·재배포 허용)를 바탕으로 하고, 발견한 결함은 엔진 소스를 직접 고쳐 다시 빌드해 씁니다. 워드 편집기와 형식 변환기는 자체 개발했습니다.</p>
+</section>
+
+<section>
+  <h2><span class="n">2</span>현재 제공 기능 (v2.5.0)</h2>
+  <table>
+    <tr><th style="width:22%">구분</th><th>내용</th></tr>
+    <tr><td>한글 문서</td><td>HWP·HWPX 열기·편집·저장·인쇄. 글자·문단 서식, 표, 그림, 머리말·꼬리말, 찾기·바꾸기</td></tr>
+    <tr><td>워드 문서</td><td>DOCX 열기·편집·저장. 서식, 표, 그림, 목록, 머리말·꼬리말과 쪽 번호</td></tr>
+    <tr><td>형식 변환</td><td>워드 → 한글, 한글 → 워드 (한컴·MS 프로그램 불필요). 줄 간격, 첨자, 형광펜, 표 테두리·여백, 쪽 나눔, 그림 위치, 배경 그림까지 옮김</td></tr>
+    <tr><td>안전장치</td><td>자동 복구(15초마다 보관, 비정상 종료 뒤 다시 실행하면 되살리기), 자동 저장</td></tr>
+    <tr><td>글꼴</td><td>공공누리 제1유형 무료 글꼴 175종 기본 탑재(제주체, 마포체, 코트라체, 칠곡할매체 등). 출처 표시 화면 포함</td></tr>
+    <tr><td>화면</td><td>한글식 밝은 화면, 직접 그린 아이콘, 빠른 실행 줄, 서식 줄, 확대·축소 막대</td></tr>
+    <tr><td>배포</td><td>Windows 설치 마법사(약 276MB), 웹판(설치 없이 브라우저에서 사용)</td></tr>
+  </table>
+</section>
+
+<section>
+  <h2><span class="n">3</span>개발 경과</h2>
+  <table>
+    <tr><th style="width:13%">버전</th><th style="width:25%">주제</th><th>주요 내용</th></tr>
+    <tr><td>초기</td><td>기본 틀</td><td>rhwp 엔진으로 한글 편집 화면 구성, 워드 편집기 자체 개발, 리본 메뉴, Windows 설치 파일, 웹판 공개</td></tr>
+    <tr><td>v2.2.0</td><td>독립 변환</td><td>한글 프로그램 없이 워드↔한글 변환</td></tr>
+    <tr><td>v2.3.0</td><td>변환 정확도</td><td>줄 간격·첨자·형광펜·표 테두리·쪽 나눔 일치. 한글 → 워드 변환 시 그림 위치, 바탕쪽 그림, 도형, WMF 그림 처리. rhwp 엔진 결함 4건 직접 수정(그림 겹침, 붙여 넣기 서식 누락, 쪽 나눔 커서 오류, 표 칸 안쪽 여백)</td></tr>
+    <tr><td>v2.4.0</td><td>화면 재구성</td><td>한글식 밝은 화면, 자체 제작 아이콘(타사 아이콘·로고 미사용), 자동 복구·자동 저장, 머리말·꼬리말 편집</td></tr>
+    <tr><td>v2.5.0</td><td>글꼴 탑재</td><td>공공누리 글꼴 175종 탑재. 깨진 글꼴은 자동 검사로 걸러 냄(16종 제외)</td></tr>
+  </table>
+</section>
+
+<section>
+  <h2><span class="n">4</span>시장 상황과 차별점</h2>
+  <p>rhwp 엔진이 공개된 뒤 이를 바탕으로 한 한글 편집 프로그램(설치형 포함)이 나오고 있으며, 한글 문서 수요가 큰 만큼 앞으로 더 늘어날 것으로 봅니다. 엔진이 같으면 기본 품질도 비슷해지므로, <b>엔진 바깥의 기능</b>에서 차이를 만듭니다.</p>
+  <table>
+    <tr><th style="width:30%">항목</th><th class="c" style="width:22%">일반 rhwp 기반 앱</th><th class="c" style="width:22%">한글 편집기</th><th>비고</th></tr>
+    <tr><td>워드(DOCX) 편집</td><td class="c">없음</td><td class="c"><span class="tag t-done">제공</span></td><td>한 프로그램에서 두 형식</td></tr>
+    <tr><td>한글↔워드 변환</td><td class="c">없음</td><td class="c"><span class="tag t-done">제공</span></td><td>타사 프로그램 불필요</td></tr>
+    <tr><td>엔진 결함 수정</td><td class="c">원본 그대로</td><td class="c"><span class="tag t-done">4건 수정</span></td><td>그림 겹침 등</td></tr>
+    <tr><td>자동 복구</td><td class="c">없음</td><td class="c"><span class="tag t-done">제공</span></td><td>15초 간격</td></tr>
+    <tr><td>무료 글꼴 탑재</td><td class="c">제한적</td><td class="c"><span class="tag t-part">워드 화면</span></td><td>한글 화면은 1단계에서</td></tr>
+    <tr><td>문서 공유·편집 잠금</td><td class="c">없음</td><td class="c"><span class="tag t-next">2단계 예정</span></td><td>서버 없이 공유 폴더 이용</td></tr>
+  </table>
+</section>
+
+<section class="avoid">
+  <h2><span class="n">5</span>앞으로의 계획</h2>
+  <div class="road">
+    <div class="step done"><div class="s">완료</div><b>핵심 기능</b>편집·변환·화면·자동 복구·글꼴 탑재 (v2.5.0)</div>
+    <div class="step"><div class="s">1단계</div><b>한글 화면 글꼴</b>엔진의 글꼴 처리를 고쳐 탑재 글꼴·PC 글꼴을 한글 화면에서도 표시</div>
+    <div class="step"><div class="s">2단계</div><b>공유 폴더 협업</b>편집 잠금, 바뀐 내용 알림, 버전 기록, 덮어쓰기 방지</div>
+    <div class="step"><div class="s">3단계</div><b>변환 마무리</b>한글 → 워드 쪽 수 일치, 워드 화면 인쇄에 머리말 포함</div>
+    <div class="step"><div class="s">4단계</div><b>공개 배포</b>최종 점검 뒤 웹판·설치 파일 공개</div>
+  </div>
+</section>
+
+<section class="avoid">
+  <h3>2단계: 공유 폴더 협업 방식</h3>
+  <p>사용자가 이미 쓰는 클라우드 드라이브(네이버 MYBOX, 구글 드라이브, OneDrive 등)의 공유 폴더에 문서를 두고, 프로그램이 다음을 처리합니다. MS 오피스가 공유 폴더에서 쓰는 방식과 같습니다.</p>
+  <table>
+    <tr><th style="width:24%">기능</th><th>동작</th></tr>
+    <tr><td>편집 잠금</td><td>누군가 문서를 열면 다른 사람에게 "○○님 편집 중"이 표시되고 읽기 전용으로 열림</td></tr>
+    <tr><td>바뀐 내용 알림</td><td>보고 있는 문서가 다른 사람에 의해 저장되면 "새 내용이 있습니다" 안내 후 다시 불러오기</td></tr>
+    <tr><td>버전 기록</td><td>저장할 때마다 이전 판을 보관해 잘못 고친 경우 되돌리기</td></tr>
+    <tr><td>덮어쓰기 방지</td><td>두 사람이 거의 동시에 저장하면 한쪽을 사본으로 남기고 알림</td></tr>
+  </table>
+  <div class="note"><b>서버 없이 운영:</b> 문서 보관·보안·용량은 사용자의 드라이브가 맡으므로 별도 서버가 필요 없고, 운영 비용과 개인정보 관리 부담이 없습니다. 이 기능은 설치형(Windows)에서 제공합니다.</div>
+</section>
+
+<section>
+  <h2><span class="n">6</span>범위에서 제외한 것</h2>
+  <table>
+    <tr><th style="width:30%">항목</th><th>제외 이유</th></tr>
+    <tr><td>실시간 동시 편집(여러 명이 동시에 타이핑)</td><td>현재 쓰임새에 필요하지 않고, 엔진 구조를 크게 바꿔야 함. 편집 잠금 방식으로 대체</td></tr>
+    <tr><td>자체 클라우드 서버</td><td>서버 운영 비용·관리 부담. 사용자의 클라우드 드라이브로 대체</td></tr>
+    <tr><td>문서 엔진 처음부터 새로 개발</td><td>개발 기간이 지나치게 김. 공개 엔진(rhwp)을 고쳐 쓰는 편이 빠르고 안정적</td></tr>
+    <tr><td>한컴·MS 글꼴, 아이콘, 로고</td><td>저작권·상표 문제. 공공누리 무료 글꼴과 자체 제작 아이콘 사용</td></tr>
+  </table>
+  <p class="muted">한글·워드 내부 문서 구조를 하나로 합치는 작업(왕복 변환 오차의 근본 해결)은 4단계 이후 필요성을 보고 결정합니다.</p>
+</section>
+
+<section>
+  <h2><span class="n">7</span>남은 과제와 위험 요소</h2>
+  <table>
+    <tr><th style="width:28%">과제</th><th style="width:16%" class="c">대응 단계</th><th>내용</th></tr>
+    <tr><td>한글 화면 글꼴 표시</td><td class="c">1단계</td><td>엔진이 탑재 글꼴을 인식은 하지만 그릴 때 기본 글꼴로 나옴. 엔진 내부 수정 필요</td></tr>
+    <tr><td>한글 → 워드 쪽 수 차이</td><td class="c">3단계</td><td>시험 문서 기준 원본 5쪽이 6쪽으로 변환됨. 표 줄 높이의 작은 차이가 누적된 것</td></tr>
+    <tr><td>워드 화면 인쇄 시 머리말</td><td class="c">3단계</td><td>저장한 파일에는 들어가지만 PDF 인쇄 화면에는 아직 빠짐</td></tr>
+    <tr><td>일부 글꼴 제외</td><td class="c">해당 없음</td><td>원본 파일 손상으로 16종 제외(감탄로드, 소요단풍 등). 제작처가 고친 판을 내면 추가 가능</td></tr>
+    <tr><td>경쟁 프로그램 증가</td><td class="c">상시</td><td>같은 엔진 기반 앱이 늘어날 전망. 워드 통합·변환 정확도·공유 기능으로 차별화</td></tr>
+    <tr><td>설치 파일 크기</td><td class="c">상시</td><td>글꼴 탑재로 약 276MB. 필요하면 글꼴을 선택 설치로 나누는 방안 검토</td></tr>
+  </table>
+</section>
+
+<section class="avoid">
+  <h2><span class="n">8</span>진행률</h2>
+  <div class="bar"><i></i></div>
+  <div class="bar-legend"><span>시작</span><span><b>약 70%</b> — 핵심 기능 완료</span><span>공개 배포</span></div>
+  <table style="margin-top:10px">
+    <tr><th>영역</th><th class="c" style="width:18%">상태</th></tr>
+    <tr><td>한글·워드 편집, 형식 변환, 화면, 자동 복구, 글꼴 탑재</td><td class="c"><span class="tag t-done">완료</span></td></tr>
+    <tr><td>1단계 한글 화면 글꼴</td><td class="c"><span class="tag t-next">다음 착수</span></td></tr>
+    <tr><td>2단계 공유 폴더 협업</td><td class="c"><span class="tag t-next">예정</span></td></tr>
+    <tr><td>3단계 변환 마무리</td><td class="c"><span class="tag t-next">예정</span></td></tr>
+    <tr><td>4단계 공개 배포</td><td class="c"><span class="tag t-next">예정</span></td></tr>
+    <tr><td>내부 문서 구조 통합</td><td class="c"><span class="tag t-opt">추후 결정</span></td></tr>
+  </table>
+</section>
+
+<footer>
+  한글 편집기 개발 계획 보고서 · 2026년 11월 21일 · 진행률은 4단계(공개 배포) 완료를 100%로 본 추정치입니다.<br>
+  "한글", "한컴오피스"는 ㈜한글과컴퓨터, "워드", "MS 오피스"는 Microsoft Corporation의 상표이며, 이 프로그램은 두 회사와 관계가 없습니다.
+</footer>
+
+</body>
+</html>
