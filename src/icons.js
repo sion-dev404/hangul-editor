@@ -55,6 +55,7 @@ export const ICONS = {
   cloudup: svg(`<path d="M9 24h15a5 5 0 0 0 .6-10A7.5 7.5 0 0 0 10 12.5 5.8 5.8 0 0 0 9 24z" fill="${L}"/><path d="M16 27V16M12 19.5l4-4 4 4" stroke="${A}"/>`),
   cloudopen: svg(`<path d="M9 22h15a5 5 0 0 0 .6-10A7.5 7.5 0 0 0 10 10.5 5.8 5.8 0 0 0 9 22z" fill="${L}"/><path d="M13.5 26.5l-1.2 1.2a3 3 0 0 1-4.2-4.2l2.4-2.4a3 3 0 0 1 4.2 0M18.5 22.5l1.2-1.2a3 3 0 0 1 4.2 4.2l-2.4 2.4a3 3 0 0 1-4.2 0" stroke="${A}"/>`),
   share: svg(`<circle cx="23" cy="8" r="3.5" fill="${L}"/><circle cx="9" cy="16" r="3.5" fill="${L}"/><circle cx="23" cy="24" r="3.5" fill="${L}"/><path d="M12 14.3l8-4.6M12 17.7l8 4.6" stroke="${A}"/>`),
+  user: svg(`<circle cx="16" cy="11" r="5.5" fill="${L}"/><path d="M6 27c1.5-5.5 5.5-8 10-8s8.5 2.5 10 8z" fill="${L}"/><path d="M21 22l2 2 4-4" stroke="${A}"/>`),
   history: svg(`<circle cx="17" cy="16" r="10" fill="${L}"/><path d="M17 10v6l4 3"/><path d="M5 11l2 5 4.5-2.5" stroke="${A}"/>`),
 };
 

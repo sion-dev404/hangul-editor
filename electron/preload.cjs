@@ -9,4 +9,10 @@ contextBridge.exposeInMainWorld('desktop', {
   convertBytes: (o) => ipcRenderer.invoke('convert-bytes', o),
   openInHangul: (o) => ipcRenderer.invoke('open-in-hangul', o),
   onOpenFile: (cb) => ipcRenderer.on('open-file', (_e, f) => cb(f)),
+  // 클라우드 로그인 1회용 코드 (한 번만 받고 끝낸다)
+  onAuthCode: (cb) => {
+    const h = (_e, code) => { ipcRenderer.removeListener('auth-code', h); cb(code); };
+    ipcRenderer.on('auth-code', h);
+    return () => ipcRenderer.removeListener('auth-code', h);
+  },
 });

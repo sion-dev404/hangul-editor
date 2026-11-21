@@ -36,6 +36,7 @@ const RIBBON = [
       { a: 'cloudShare', i: 'share', l: '공유 링크' },
       { a: 'cloudVersions', i: 'history', l: '버전 기록' },
       { a: 'cloudOpen', i: 'cloudopen', l: '링크로 열기' },
+      { a: 'cloudAccount', i: 'user', l: '계정' },
     ] },
     { label: '정보', big: [{ a: 'fontCredits', i: 'style', l: '글꼴 출처' }] },
   ] },
@@ -295,6 +296,7 @@ const ACTS = {
   cloudShare: () => ctx.cloud.share(),
   cloudVersions: () => ctx.cloud.versions(),
   cloudOpen: () => ctx.cloud.openLink(),
+  cloudAccount: () => ctx.cloud.account(),
 };
 
 // 클라우드에 올릴 지금 문서 (열린 형식 그대로)

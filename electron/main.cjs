@@ -26,6 +26,20 @@ function startServer() {
     const srv = http.createServer((req, res) => {
       let p;
       try { p = decodeURIComponent(new URL(req.url, 'http://x').pathname); } catch { res.writeHead(400); res.end(); return; }
+      // 클라우드 로그인: 브라우저에서 Google 로그인을 마치면 1회용 코드를 들고 여기로 돌아온다.
+      // 코드만으로는 쓸 수 없다(편집기 창만 아는 비밀값이 함께 있어야 함). 편집기 창에 넘기고 창을 앞으로 가져온다.
+      if (p === '/__auth') {
+        const code = new URL(req.url, 'http://x').searchParams.get('code') || '';
+        const okCode = /^lc\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(code) && code.length < 4096;
+        if (okCode && win) {
+          win.webContents.send('auth-code', code);
+          if (win.isMinimized()) win.restore();
+          win.focus();
+        }
+        res.writeHead(okCode ? 200 : 400, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' });
+        res.end(`<!doctype html><meta charset="utf-8"><title>한글 편집기</title><body style="font:15px 'Malgun Gothic',sans-serif;display:grid;place-items:center;min-height:90vh;background:#f3f5f8"><div style="background:#fff;padding:28px 34px;border-radius:14px;text-align:center">${okCode ? '<b>로그인했습니다.</b><br>이 창을 닫고 한글 편집기로 돌아가세요.' : '<b>잘못된 요청입니다.</b>'}</div>`);
+        return;
+      }
       if (p.endsWith('/')) p += 'index.html';
       const f = path.normalize(path.join(ROOT, p));
       if (!f.startsWith(ROOT)) { res.writeHead(403); res.end(); return; }

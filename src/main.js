@@ -824,7 +824,7 @@ const cloudCtx = {
   async markSaved() { if (document.body.dataset.mode === 'hwp') await hwpMarkSavedCloud(); else $('#saveState').textContent = '클라우드 저장됨'; },
   cloud: {
     save: () => cloud.saveToCloud(), share: () => cloud.shareDialog(), versions: () => cloud.versionsDialog(),
-    openLink: () => cloud.openFromClipboard(), leave: () => cloud.leave(),
+    openLink: () => cloud.openFromClipboard(), leave: () => cloud.leave(), account: () => cloud.accountDialog(),
   },
 };
 
@@ -924,6 +924,7 @@ const actions = {
   cloudShare() { cloud.shareDialog(); },
   cloudVersions() { cloud.versionsDialog(); },
   cloudOpen() { cloud.openFromClipboard(); },
+  cloudAccount() { cloud.accountDialog(); },
   hf() { openHF(false); },
   hfNum() { openHF(true); },
   hfClose() { $('#hfDlg').hidden = true; },
