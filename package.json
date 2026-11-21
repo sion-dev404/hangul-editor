@@ -12,7 +12,8 @@
     "preview": "vite preview",
     "app": "vite build && electron .",
     "fonts": "node tools/fetch-fonts.mjs",
-    "dist": "node tools/fetch-fonts.mjs && vite build && electron-builder --win"
+    "dist": "node tools/fetch-fonts.mjs && vite build && electron-builder --win --dir && node tools/make-setup.mjs",
+    "setup": "node tools/make-setup.mjs"
   },
   "devDependencies": {
     "@rhwp/core": "^0.9.0",
@@ -38,7 +39,7 @@
     "win": {
       "target": [
         {
-          "target": "nsis",
+          "target": "dir",
           "arch": [
             "x64"
           ]
@@ -46,17 +47,9 @@
       ],
       "icon": "build/icon.png"
     },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "shortcutName": "한글 편집기",
-      "installerLanguages": [
-        "ko_KR"
-      ],
-      "language": "1042",
-      "artifactName": "HangulEditor-Setup-${version}.${ext}"
-    }
+    "electronLanguages": [
+      "ko",
+      "en-US"
+    ]
   }
 }

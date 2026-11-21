@@ -35,9 +35,17 @@
 - 글꼴 상자: `src/fontpicker.js`가 두 화면 글꼴 상자에 직접 만든 목록을 띄운다(공공누리 글꼴에 직접 그린 "공공누리" 표시, 마우스를 올리면 저작권자). 한글 화면은 rhwp가 상자의 `pointerdown`을 막고 자기 메뉴를 열기 때문에 문서 단계 capture로 `pointerdown`·`mousedown`·`click`을 먼저 가로챈다. 목록 맨 아래 "PC 글꼴 · 분류별 보기…"는 rhwp 원래 메뉴(PC 글꼴 포함)를 연다. rhwp가 문서를 열 때 상자를 다시 채우면 `hwp-mode.js`의 MutationObserver가 공공누리 묶음을 다시 붙인다.
 - 출처 표시: 파일 탭의 "글꼴 출처"가 `출처표시.txt`를 연다.
 
+## 설치 프로그램 (우리 디자인)
+- 설치 마법사(NSIS) 대신 직접 만든 설치 화면을 쓴다. electron-builder는 `--dir`로 `release/win-unpacked`만 만들고, `tools/make-setup.mjs`가 그 폴더를 zip으로 묶어 `tools/setup/Setup.cs`(C# WPF, Windows 기본 .NET Framework 4의 `csc.exe`)에 넣어 컴파일한다. 같은 소스를 `/define:UNINSTALL`로 컴파일한 지우기 프로그램(`Uninstall 한글 편집기.exe`)이 설치 폴더에 들어간다.
+- 기본 설치 위치는 내 계정(`%LOCALAPPDATA%Programshangul-editor`)이라 관리자 확인 창이 없다. 등록 정보는 HKCU `...Uninstallio.github.sion-dev404.hangul-editor`(Windows "앱 제거"에 나옴).
+- 예전 마법사로 깐 판(제거 정보의 `Uninstall 한글 편집기.exe`)이 있으면 `/S _?=폴더`로 지우고 바꾼다. 컴퓨터 전체 설치였으면 그때만 관리자 확인 창이 뜬다. 편집기가 켜져 있으면 창 닫기를 부탁하고 기다린다(저장 안 한 내용은 편집기가 묻는다).
+- 명령줄: `/S`(창 없이), `--dir=`, `--no-desktop`, `--no-launch`, `--test`(파일만 풀기, 점검용), `--snap=`(화면 그림만). 지우기: `/S`, `--purge`(설정·자동 복구 자료까지).
+- C# 소스는 C# 5 문법만 된다(`?.`, `$""` 안 됨). 문자열 안에 진짜 줄바꿈을 넣지 말 것(`
+`).
+
 ## 명령
 - 개발 서버: `npm run dev`
-- 설치 파일: `npm run dist` → `release/HangulEditor-Setup-<버전>.exe`
+- 설치 파일: `npm run dist` → `release/HangulEditor-Setup-<버전>.exe` (설치 화면만 다시 만들 때: `npm run setup`, 화면 그림만 뽑기: `node tools/make-setup.mjs --snap=<폴더>`)
 
 ## 주의
 - `public/studio/`는 rhwp v0.9.0의 `rhwp-studio`를 `RHWP_WITHOUT_AI=1 npx vite build --base=./`로 빌드한 결과물이다(서비스 워커 파일은 지움). 다시 만들려면 저장소를 sparse로 받고 `pkg/`에 `@rhwp/core`의 `rhwp.js`, `rhwp_bg.wasm`을 넣는다. Windows에서는 `public/fonts` 심볼릭 링크가 깨지므로 `assets/fonts`를 직접 복사한다.
