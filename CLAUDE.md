@@ -78,6 +78,6 @@
   - Rust 1.93.1 `x86_64-pc-windows-gnu` + `wasm32-unknown-unknown`, `wasm32-wasip1` 타깃.
   - 툴체인의 `llvm-ar.exe`를 `llvm-dlltool.exe`로 복사하고 `-C dlltool=`로 지정(빌드 스크립트 링크용).
   - `wasm-bindgen` CLI 대신 `tools/wb-wasi`(wasm-bindgen-cli-support를 WASI로 빌드)를 Node로 실행.
-- **엔진 소스 위치: `C:\Users\redsi\swpro\rhwp-src`** (git으로 기록, 출발점 커밋 = rhwp 0.9.0 + 위 수정). 빌드 도구 `C:\Users\redsi\swpro\wb-wasi`, `C:\Users\redsi\swpro\build-engine.ps1`(이 폴더 기준으로 동작). hwpcore(자체 엔진)는 이 소스에서 단계적으로 키운다.
+- **엔진 소스 위치: `C:\Users\redsi\hwpcore\rhwp-src`** (git으로 기록, 출발점 커밋 = rhwp 0.9.0 + 위 수정). 빌드 도구 `C:\Users\redsi\hwpcore\wb-wasi`, `C:\Users\redsi\hwpcore\build-engine.ps1`(이 폴더 기준으로 동작). hwpcore(자체 엔진)는 이 소스에서 단계적으로 키운다.
 - 순서: `tools/build-engine.ps1`(엔진 → `pkg-new/`) → `pkg/`와 `rhwp-studio/public/rhwp.js`에 복사 → `rhwp-studio`에서 `RHWP_WITHOUT_AI=1 npx vite build --base=./` → `tools/install-studio.ps1 -Studio <rhwp-studio 경로>`(엔진 파일 이름을 `rhwp_bg.wasm`으로 고정해 화면 쪽과 같이 쓴다).
 - 빌드 한 번에 약 8~10분 걸린다. 배치 결과는 `tools/engine-check.mjs`로 Node에서 바로 확인한다(`all` 명령으로 수정 전후 비교).
