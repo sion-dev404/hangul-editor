@@ -2,6 +2,7 @@ import './style.css';
 import { initHwp, openHwp, showHwp, newDocument as newHwpDocument, offerRecovery } from './hwp-mode.js';
 import { icon } from './icons.js';
 import { putRecovery, getRecovery, clock } from './recovery.js';
+import { loadFontPack, injectFontCss } from './fonts.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -212,6 +213,14 @@ function layout() {
   $('#zoomLabel').textContent = `${Math.round(doc.zoom * 100)}%`;
   $('#zoomSlider').value = String(Math.round(doc.zoom * 100));
   renderHF(pages, m);
+}
+
+// 함께 넣은 글꼴의 출처 표시 (공공누리 제1유형 조건)
+function openFontCredits() {
+  loadFontPack().then((pack) => {
+    if (!pack) { toast('함께 넣은 글꼴이 없습니다'); return; }
+    window.open(new URL('./fonts/kogl/출처표시.txt', location.href).href, '_blank');
+  });
 }
 
 /* ---------- 머리말 · 꼬리말 ---------- */
@@ -891,6 +900,7 @@ const actions = {
       } catch { toast('붙이지 못했습니다. 문서 안을 누른 뒤 다시 시도하세요'); }
     }
   },
+  fontCredits() { openFontCredits(); },
   hf() { openHF(false); },
   hfNum() { openHF(true); },
   hfClose() { $('#hfDlg').hidden = true; },
@@ -931,6 +941,20 @@ function init() {
   // 고르기 상자 채우기
   $('#sizeSel').innerHTML = SIZES.map((s) => `<option value="${s}">${s}pt</option>`).join('');
   $('#sizeSel').value = '10'; // 새 문서 기본 글자 크기
+  // 함께 넣은 공공누리 글꼴을 글꼴 목록에 붙인다 (없으면 그냥 넘어간다)
+  loadFontPack().then((pack) => {
+    if (!pack) return;
+    injectFontCss(document, pack);
+    const g = document.createElement('optgroup');
+    const fams = [...new Set(pack.fonts.map((f) => f.family))];
+    g.label = `공공누리 글꼴 (${fams.length})`;
+    for (const fam of fams) {
+      const o = document.createElement('option');
+      o.value = fam; o.textContent = fam; o.style.fontFamily = `'${fam.replace(/'/g, '')}'`;
+      g.append(o);
+    }
+    $('#fontSel').append(g);
+  });
   $('#popColor').innerHTML = `<div class="swatches">${COLORS.map((c) => `<button data-color="${c}" style="background:${c}" title="${c}"></button>`).join('')}</div>`;
   $('#popHilite').innerHTML = `<div class="swatches">${HILITES.map((c) => `<button data-hilite="${c}" style="background:${c === 'transparent' ? '#fff' : c}">${c === 'transparent' ? '없음' : ''}</button>`).join('')}</div>`;
   $('#popChars').innerHTML = [...CHARS].map((c) => `<button data-char="${c}">${c}</button>`).join('');
@@ -1015,6 +1039,7 @@ function init() {
     saveBytes,
     setName: (n) => { $('#docName').value = n; },
     setSaveState: (t) => { $('#saveState').textContent = t; },
+    fontCredits: openFontCredits,
   });
 
   // 설치형(.exe) 전용 기능

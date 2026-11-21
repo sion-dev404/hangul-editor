@@ -24,6 +24,14 @@
 - **자동 복구**: 한글 화면은 고친 내용이 있으면 15초마다 문서를 IndexedDB(`src/recovery.js`, 키 `hwp`)에 넣고, 저장하면 지운다. 다음 실행에서 되살릴지 묻는다. 워드 화면은 localStorage에 저장하고, 용량이 넘으면 IndexedDB(키 `docx`)에 넣는다.
 - **머리말·꼬리말(워드 화면)**: `doc.parts = { header, footer }`(HTML). 화면 맨 위·아래 여백에 미리 보이고(`#hdrView`/`#ftrView`), 눌러서 대화 상자(`#hfDlg`)로 고친다. 쪽 번호는 `span[data-field=page]`로 저장 때 워드의 쪽 번호 필드가 된다. 인쇄(PDF)에는 아직 들어가지 않는다.
 
+## 함께 넣은 글꼴 (공공누리 제1유형)
+- `node tools/fetch-fonts.mjs`(=`npm run fonts`, `npm run dist`가 자동 실행)가 공유마당 "공공 안심글꼴"(모두 공공누리 제1유형: 출처표시 조건으로 상업 이용·변형 허용)을 받아 `public/fonts/kogl/`에 WOFF와 `manifest.json`, `출처표시.txt`를 만든다. 받은 압축은 `.font-cache/`에 두고 다시 받지 않는다. 두 폴더 모두 git에 넣지 않는다(용량).
+- `--pick=tools/font-picks.txt`: 아직 안 받은 것 중 적힌 이름만 받는다. `--force`: 목록을 다시 만든다. `node tools/missing-fonts.mjs`: 안 받은 글꼴 이름 보기.
+- 글꼴마다 otf·ttf(및 깨진 kern/vhea 표를 뺀 판)를 후보로 만들고 `tools/font-validate.cjs`(Electron)로 실제 화면 엔진에서 열리는지 시험해 고른다. 어느 것도 안 열리는 글꼴(감탄로드·소요단풍·전주 완판본 순체 등 16개)은 뺀다.
+- 워드 화면: `src/fonts.js`가 @font-face를 선언하고 글꼴 상자에 "공공누리 글꼴" 묶음을 붙인다.
+- 한글 화면(rhwp): 아직 연결하지 못했다. rhwp가 "사용 중"으로 인식까지는 하지만(queryLocalFonts 끼우기 `studio/kogl-hook.js` + 화면에 글꼴 올리기) 실제 그리기는 기본 글꼴로 나온다. 그래서 `hwp-mode.js`에서는 꺼 두었다.
+- 출처 표시: 파일 탭의 "글꼴 출처"가 `출처표시.txt`를 연다.
+
 ## 명령
 - 개발 서버: `npm run dev`
 - 설치 파일: `npm run dist` → `release/HangulEditor-Setup-<버전>.exe`

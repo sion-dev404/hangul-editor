@@ -12,6 +12,9 @@ $utf8 = New-Object Text.UTF8Encoding $false
 $h = [IO.File]::ReadAllText("$dist\index.html")
 $h = [regex]::Replace($h, '<script[^>]*registerSW\.js[^>]*></script>', '')
 $h = [regex]::Replace($h, '<link[^>]*manifest\.webmanifest[^>]*>', '')
+# 공공누리 글꼴 연결: rhwp 본체보다 먼저 실행되는 작은 파일을 넣는다 (tools\studio-kogl-hook.js)
+Copy-Item (Join-Path $proj 'tools\studio-kogl-hook.js') "$dist\kogl-hook.js" -Force
+if (-not $h.Contains('kogl-hook.js')) { $h = $h.Replace('<script src="./theme-init.js"></script>', "<script src=`"./kogl-hook.js`"></script>`n  <script src=`"./theme-init.js`"></script>") }
 [IO.File]::WriteAllText("$dist\index.html", $h, $utf8)
 
 # 엔진 파일 이름을 rhwp_bg.wasm으로 고정한다 (화면 쪽 src/engine.js가 같은 파일을 쓴다)

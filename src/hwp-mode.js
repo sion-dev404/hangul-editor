@@ -2,6 +2,10 @@
 import { createStudio } from '@rhwp/editor';
 import { icon } from './icons.js';
 import { putRecovery, getRecovery, delRecovery, clock } from './recovery.js';
+// 공공누리 글꼴의 한글 화면(rhwp) 연결은 아직 꺼 둔다.
+// rhwp가 글꼴을 "사용 중"으로 인식하게까지는 했지만(src/fonts.js의 patchLocalFonts·preloadFonts,
+// studio/kogl-hook.js) 실제 그리기는 여전히 기본 글꼴로 나와, 문서를 두 번 읽는 비용만 생긴다.
+// 다시 켜려면 window.__koglFonts = { patch: patchLocalFonts } 를 두고 문서를 연 뒤 쓰인 글꼴을 올려 다시 읽는다.
 
 const $ = (s, r = document) => r.querySelector(s);
 const host = $('#studioHost');
@@ -29,6 +33,7 @@ const RIBBON = [
       { c: 'file:print', i: 'print', l: '인쇄' },
     ] },
     { label: '원본 확인', big: [{ a: 'openInHangul', i: 'openhwp', l: '한글에서 열어 보기', desktopOnly: true }] },
+    { label: '정보', big: [{ a: 'fontCredits', i: 'style', l: '글꼴 출처' }] },
   ] },
   { id: 'home', label: '편집', groups: [
     { label: '클립보드', big: [{ c: 'edit:paste', i: 'paste', l: '붙이기' }], rows: [
@@ -281,6 +286,7 @@ const ACTS = {
   saveHwpx: () => save('hwpx'),
   saveDocx,
   openInHangul,
+  fontCredits: () => ctx.fontCredits?.(),
 };
 
 export async function newDocument() {
