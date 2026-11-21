@@ -28,8 +28,11 @@
 - `node tools/fetch-fonts.mjs`(=`npm run fonts`, `npm run dist`가 자동 실행)가 공유마당 "공공 안심글꼴"(모두 공공누리 제1유형: 출처표시 조건으로 상업 이용·변형 허용)을 받아 `public/fonts/kogl/`에 WOFF와 `manifest.json`, `출처표시.txt`를 만든다. 받은 압축은 `.font-cache/`에 두고 다시 받지 않는다. 두 폴더 모두 git에 넣지 않는다(용량).
 - `--pick=tools/font-picks.txt`: 아직 안 받은 것 중 적힌 이름만 받는다. `--force`: 목록을 다시 만든다. `node tools/missing-fonts.mjs`: 안 받은 글꼴 이름 보기.
 - 글꼴마다 otf·ttf(및 깨진 kern/vhea 표를 뺀 판)를 후보로 만들고 `tools/font-validate.cjs`(Electron)로 실제 화면 엔진에서 열리는지 시험해 고른다. 어느 것도 안 열리는 글꼴(감탄로드·소요단풍·전주 완판본 순체 등 16개)은 뺀다.
-- 워드 화면: `src/fonts.js`가 @font-face를 선언하고 글꼴 상자에 "공공누리 글꼴" 묶음을 붙인다.
-- 한글 화면(rhwp): 아직 연결하지 못했다. rhwp가 "사용 중"으로 인식까지는 하지만(queryLocalFonts 끼우기 `studio/kogl-hook.js` + 화면에 글꼴 올리기) 실제 그리기는 기본 글꼴로 나온다. 그래서 `hwp-mode.js`에서는 꺼 두었다.
+- 워드 화면: `src/fonts.js`가 @font-face를 선언한다.
+- 한글 화면(rhwp): rhwp의 기본 그리기 방식은 **Canvas 2D**(CanvasKit 아님, `?renderer=canvaskit`일 때만)다. 엔진은 Canvas에 `13px "글꼴이름", 대체…`를 넘기는데, rhwp가 `CanvasRenderingContext2D.font` 설정을 감싸(`wl.resolve`) "쓸 수 있는 글꼴"이 아니면 이름을 대체 글꼴로 바꾼다. 그래서:
+  - `tools/patch-studio.mjs`가 rhwp 코드(`public/studio/assets/index-*.js`, 압축된 이름)의 그 판단(`u=…||In.has(e)||…`)에 `window.__koglHas(e)`를, CanvasKit용 글꼴 표 함수 맨 앞에 `window.__koglTn(표,이름정리)`를 넣고, `kogl-hook.js`를 `index.html`·`print.html`에 넣는다. `install-studio.ps1`이 자동 실행한다. rhwp 버전이 바뀌면 정규식이 안 맞아 오류로 멈추니 그때 고친다.
+  - `tools/studio-kogl-hook.js`(→ `public/studio/kogl-hook.js`)는 manifest를 동기로 읽고 @font-face를 선언한 뒤, Canvas가 공공누리 글꼴 이름을 처음 쓰면 `document.fonts.load()`로 받는다. 받기가 끝나면 rhwp가 `loadingdone`에서 글자 폭을 다시 재고 다시 그린다. 인쇄 창은 `document.fonts.ready`를 기다린 뒤 인쇄한다.
+- 글꼴 상자: `src/fontpicker.js`가 두 화면 글꼴 상자에 직접 만든 목록을 띄운다(공공누리 글꼴에 직접 그린 "공공누리" 표시, 마우스를 올리면 저작권자). 한글 화면은 rhwp가 상자의 `pointerdown`을 막고 자기 메뉴를 열기 때문에 문서 단계 capture로 `pointerdown`·`mousedown`·`click`을 먼저 가로챈다. 목록 맨 아래 "PC 글꼴 · 분류별 보기…"는 rhwp 원래 메뉴(PC 글꼴 포함)를 연다. rhwp가 문서를 열 때 상자를 다시 채우면 `hwp-mode.js`의 MutationObserver가 공공누리 묶음을 다시 붙인다.
 - 출처 표시: 파일 탭의 "글꼴 출처"가 `출처표시.txt`를 연다.
 
 ## 명령

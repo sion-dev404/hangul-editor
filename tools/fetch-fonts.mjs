@@ -76,23 +76,6 @@ function toWoff(buf, drop = []) {
   return Buffer.concat([head, dir, ...parts]);
 }
 
-// 이름표만 든 작은 SFNT (name·OS/2·head 표만). rhwp가 PC 글꼴 목록을 훑을 때는 이것만 읽는다.
-function stubSfnt(buf) {
-  const tb = tables(buf);
-  const tags = ['OS/2', 'head', 'name'].filter((t) => tb[t]);
-  let off = 12 + 16 * tags.length; const parts = [];
-  const dir = Buffer.alloc(16 * tags.length);
-  tags.forEach((t, i) => {
-    const { off: o, len, sum } = tb[t];
-    dir.write(t, i * 16, 'latin1'); dir.writeUInt32BE(sum, i * 16 + 4); dir.writeUInt32BE(off, i * 16 + 8); dir.writeUInt32BE(len, i * 16 + 12);
-    const pad = (4 - (len % 4)) % 4;
-    parts.push(buf.subarray(o, o + len), Buffer.alloc(pad)); off += len + pad;
-  });
-  const head = Buffer.alloc(12);
-  head.writeUInt32BE(buf.readUInt32BE(0), 0); head.writeUInt16BE(tags.length, 4);
-  return Buffer.concat([head, dir, ...parts]);
-}
-
 /* ---------- 목록 페이지 ---------- */
 async function list() {
   const html = await (await fetch(PAGE, { headers: UA })).text();
@@ -190,7 +173,6 @@ async function main() {
       const add = (woff, stripped) => {
         const cf = path.join(CAND, `c${String(candNo++).padStart(4, '0')}.woff`);
         fs.writeFileSync(cf, woff);
-        fs.writeFileSync(cf.replace(/\.woff$/, '.head'), stubSfnt(buf));
         face.cands.push({ file: cf, stripped });
       };
       add(toWoff(buf), false);
@@ -225,7 +207,6 @@ async function main() {
     if (!good.length) { dropped.push(face.meta.family); continue; }
     const file = `f${String(fonts.length + 1).padStart(3, '0')}.woff`;
     fs.copyFileSync(good[0].file, path.join(OUT, file));
-    fs.copyFileSync(good[0].file.replace(/\.woff$/, '.head'), path.join(OUT, file.replace(/\.woff$/, '.head')));
     bytes += fs.statSync(good[0].file).size;
     fonts.push({ ...face.meta, file });
   }

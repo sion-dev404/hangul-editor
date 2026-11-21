@@ -2,10 +2,10 @@
 import { createStudio } from '@rhwp/editor';
 import { icon } from './icons.js';
 import { putRecovery, getRecovery, delRecovery, clock } from './recovery.js';
-// 공공누리 글꼴의 한글 화면(rhwp) 연결은 아직 꺼 둔다.
-// rhwp가 글꼴을 "사용 중"으로 인식하게까지는 했지만(src/fonts.js의 patchLocalFonts·preloadFonts,
-// studio/kogl-hook.js) 실제 그리기는 여전히 기본 글꼴로 나와, 문서를 두 번 읽는 비용만 생긴다.
-// 다시 켜려면 window.__koglFonts = { patch: patchLocalFonts } 를 두고 문서를 연 뒤 쓰인 글꼴을 올려 다시 읽는다.
+import { loadFontPack } from './fonts.js';
+import { addKoglGroup, attachFontPicker } from './fontpicker.js';
+// 공공누리 글꼴의 한글 화면 연결: 그리기는 studio/kogl-hook.js + tools/patch-studio.mjs가 맡고,
+// 여기서는 서식 줄 글꼴 상자(#font-name)에 공공누리 묶음과 표시가 붙는 목록을 단다.
 
 const $ = (s, r = document) => r.querySelector(s);
 const host = $('#studioHost');
@@ -142,6 +142,17 @@ async function ensureStudio() {
         const st = d.createElement('style');
         st.textContent = '#menu-bar, #icon-toolbar { display: none !important; }';
         d.head.append(st);
+        const sel = d.getElementById('font-name');
+        if (sel) {
+          loadFontPack().then((pack) => {
+            if (pack) {
+              addKoglGroup(sel, pack);
+              // rhwp가 문서를 열 때 상자를 다시 채우면 묶음을 다시 붙인다
+              new MutationObserver(() => addKoglGroup(sel, pack)).observe(sel, { childList: true });
+            }
+            attachFontPicker(sel, pack, { more: { label: 'PC 글꼴 · 분류별 보기…' } });
+          });
+        }
       } catch { await s.chrome.set({ menu: false }).catch(() => {}); }
       await s.commands.execute('view:theme-light').catch(() => {});
       studio = s;

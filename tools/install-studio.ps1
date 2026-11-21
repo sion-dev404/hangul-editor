@@ -12,10 +12,10 @@ $utf8 = New-Object Text.UTF8Encoding $false
 $h = [IO.File]::ReadAllText("$dist\index.html")
 $h = [regex]::Replace($h, '<script[^>]*registerSW\.js[^>]*></script>', '')
 $h = [regex]::Replace($h, '<link[^>]*manifest\.webmanifest[^>]*>', '')
-# 공공누리 글꼴 연결: rhwp 본체보다 먼저 실행되는 작은 파일을 넣는다 (tools\studio-kogl-hook.js)
-Copy-Item (Join-Path $proj 'tools\studio-kogl-hook.js') "$dist\kogl-hook.js" -Force
-if (-not $h.Contains('kogl-hook.js')) { $h = $h.Replace('<script src="./theme-init.js"></script>', "<script src=`"./kogl-hook.js`"></script>`n  <script src=`"./theme-init.js`"></script>") }
 [IO.File]::WriteAllText("$dist\index.html", $h, $utf8)
+# 공공누리 글꼴 연결: kogl-hook.js를 넣고 rhwp 코드에 연결 지점을 단다 (tools\patch-studio.mjs)
+node (Join-Path $proj 'tools\patch-studio.mjs') $dist
+if ($LASTEXITCODE -ne 0) { throw '공공누리 글꼴 연결 패치 실패' }
 
 # 엔진 파일 이름을 rhwp_bg.wasm으로 고정한다 (화면 쪽 src/engine.js가 같은 파일을 쓴다)
 $wasm = Get-ChildItem "$dist\assets" -Filter 'rhwp_bg-*.wasm' | Select-Object -First 1

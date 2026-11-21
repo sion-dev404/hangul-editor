@@ -3,6 +3,7 @@ import { initHwp, openHwp, showHwp, newDocument as newHwpDocument, offerRecovery
 import { icon } from './icons.js';
 import { putRecovery, getRecovery, clock } from './recovery.js';
 import { loadFontPack, injectFontCss } from './fonts.js';
+import { addKoglGroup, attachFontPicker } from './fontpicker.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -943,17 +944,11 @@ function init() {
   $('#sizeSel').value = '10'; // 새 문서 기본 글자 크기
   // 함께 넣은 공공누리 글꼴을 글꼴 목록에 붙인다 (없으면 그냥 넘어간다)
   loadFontPack().then((pack) => {
-    if (!pack) return;
-    injectFontCss(document, pack);
-    const g = document.createElement('optgroup');
-    const fams = [...new Set(pack.fonts.map((f) => f.family))];
-    g.label = `공공누리 글꼴 (${fams.length})`;
-    for (const fam of fams) {
-      const o = document.createElement('option');
-      o.value = fam; o.textContent = fam; o.style.fontFamily = `'${fam.replace(/'/g, '')}'`;
-      g.append(o);
+    if (pack) {
+      injectFontCss(document, pack);
+      addKoglGroup($('#fontSel'), pack);
     }
-    $('#fontSel').append(g);
+    attachFontPicker($('#fontSel'), pack); // 공공누리 표시가 붙는 글꼴 목록
   });
   $('#popColor').innerHTML = `<div class="swatches">${COLORS.map((c) => `<button data-color="${c}" style="background:${c}" title="${c}"></button>`).join('')}</div>`;
   $('#popHilite').innerHTML = `<div class="swatches">${HILITES.map((c) => `<button data-hilite="${c}" style="background:${c === 'transparent' ? '#fff' : c}">${c === 'transparent' ? '없음' : ''}</button>`).join('')}</div>`;
