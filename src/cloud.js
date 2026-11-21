@@ -208,7 +208,7 @@ export async function versionsDialog() {
     rows.push(`<tr><td>${v.n}${v.n === s.openedN ? ' <small style="color:#2f6fd6">(보는 중)</small>' : ''}</td><td>${esc(at)}</td><td>${esc(by)}</td><td>${(v.size / 1048576).toFixed(1)}MB</td>
       <td class="acts"><button class="btn sub" data-open="${v.n}">열기</button>${s.editToken ? ` <button class="btn sub" data-restore="${v.n}">되돌리기</button>` : ''}</td></tr>`);
   }
-  const body = el(`<div>저장할 때마다 버전이 남습니다 (최근 30개).</div>
+  const body = el(`<div>저장할 때마다 버전이 남습니다 (최근 20개).</div>
     <div class="list"><table><tr><th>버전</th><th>저장 시각</th><th>저장한 사람</th><th>크기</th><th></th></tr>${rows.join('')}</table></div>`);
   const d = dialog('버전 기록', body);
   d.querySelectorAll('[data-open]').forEach((b) => b.addEventListener('click', async () => { d.close(); await loadVersion(Number(b.dataset.open)); }));

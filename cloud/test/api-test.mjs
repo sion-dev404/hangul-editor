@@ -50,8 +50,12 @@ await new Promise((r) => setTimeout(r, 300));
 const kinds = events.map((e) => e.type + (e.type === 'version' ? e.n : e.lock ? ':' + e.lock.by : ':풀림')).join(' ');
 ok(kinds === 'lock:A version1 version2 lock:풀림 lock:B', `실시간 알림 순서: ${kinds}`);
 
-const big = await req(D, { method: 'PUT', headers: { 'X-Edit-Token': c.editToken, 'X-Lock-Id': l3.lockId }, body: new Uint8Array(51 * 1024 * 1024) });
-ok(big.status === 413, '50MB 넘는 문서 거절');
+const big = await req(D, { method: 'PUT', headers: { 'X-Edit-Token': c.editToken, 'X-Lock-Id': l3.lockId }, body: new Uint8Array(31 * 1024 * 1024) });
+ok(big.status === 413, '30MB 넘는 문서 거절');
+const mid = crypto.getRandomValues(new Uint8Array(65536)); const midBody = new Uint8Array(3.5 * 1024 * 1024); for (let i = 0; i < midBody.length; i += 65536) midBody.set(mid.subarray(0, Math.min(65536, midBody.length - i)), i); midBody[midBody.length - 1] = 77;
+const p3 = await (await req(D, { method: 'PUT', headers: { 'X-Edit-Token': c.editToken, 'X-Lock-Id': l3.lockId }, body: midBody })).json();
+const got3 = new Uint8Array(await (await req(D + '/v/' + p3.n)).arrayBuffer());
+ok(got3.length === midBody.length && got3[got3.length - 1] === 77 && got3[1048577] === midBody[1048577], `3.5MB 문서(조각 4개) 저장·받기 일치 (버전 ${p3.n})`);
 
 const del = await req(D, { method: 'DELETE', headers: { 'X-Edit-Token': c.editToken } });
 ok(del.status === 200, '문서 지우기');

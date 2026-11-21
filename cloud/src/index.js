@@ -1,7 +1,7 @@
 // 한글 편집기 클라우드 서버
 // - 문서 내용·파일 이름·작성자 이름은 모두 편집기(내 PC)에서 암호화되어 온다. 서버는 열쇠가 없어 읽을 수 없다.
 // - 문서마다 Durable Object(DocRoom) 하나: 고치기 권한 확인, 편집 잠금, 버전 목록, 실시간 알림(WebSocket)
-// - 문서 파일(버전별)은 R2에 d/<문서id>/<버전번호> 로 둔다
+// - 문서 파일(버전별)도 그 방의 저장소에 1MB 조각(c:<버전>:<순번>)으로 둔다 (R2 없이, 카드 등록 없는 무료 요금제)
 //
 // API
 //   POST   /api/docs                    새 문서 → { id, editToken }
@@ -80,15 +80,6 @@ export default {
         return room.fetch(req);
       }
 
-      // 버전 파일 받기는 R2에서 바로
-      if (parts[3] === 'v' && req.method === 'GET') {
-        const n = Number(parts[4]);
-        if (!Number.isInteger(n) || n < 1) return json({ error: 'bad version' }, 400, h);
-        const obj = await env.DOCS.get(`d/${id}/${n}`);
-        if (!obj) return json({ error: 'not found' }, 404, h);
-        return new Response(obj.body, { headers: { ...h, 'Content-Type': 'application/octet-stream', 'Cache-Control': 'private, max-age=31536000, immutable' } });
-      }
-
       // 나머지는 문서 방이 처리
       const fwd = new Request(`https://room/${parts.slice(3).join('/')}`, req);
       const res = await room.fetch(fwd);
@@ -104,8 +95,38 @@ export default {
 // ------------------------------------------------------------------
 // 문서 방
 // ------------------------------------------------------------------
+const CHUNK = 1024 * 1024; // 저장소 값 하나의 한도(2MB)보다 작게
+
 export class DocRoom {
   constructor(state, env) { this.state = state; this.env = env; }
+
+  async putBlob(n, buf) {
+    const u8 = new Uint8Array(buf);
+    const count = Math.ceil(u8.length / CHUNK);
+    const entries = {};
+    for (let i = 0; i < count; i++) entries[`c:${n}:${i}`] = u8.slice(i * CHUNK, (i + 1) * CHUNK);
+    const keys = Object.keys(entries);
+    for (let i = 0; i < keys.length; i += 100) {
+      const part = {};
+      for (const k of keys.slice(i, i + 100)) part[k] = entries[k];
+      await this.state.storage.put(part);
+    }
+    return count;
+  }
+  async getBlob(n, count, size) {
+    const out = new Uint8Array(size);
+    let off = 0;
+    for (let i = 0; i < count; i += 100) {
+      const keys = []; for (let j = i; j < Math.min(count, i + 100); j++) keys.push(`c:${n}:${j}`);
+      const got = await this.state.storage.get(keys);
+      for (const k of keys) { const c = got.get(k); if (!c) return null; out.set(c, off); off += c.length; }
+    }
+    return out;
+  }
+  async delBlob(n, count) {
+    const keys = []; for (let i = 0; i < count; i++) keys.push(`c:${n}:${i}`);
+    for (let i = 0; i < keys.length; i += 100) await this.state.storage.delete(keys.slice(i, i + 100));
+  }
 
   async meta() { return (await this.state.storage.get('meta')) || null; }
   async activeLock() {
@@ -144,6 +165,15 @@ export class DocRoom {
 
     const lockInfo = (l) => (l ? { by: l.by, until: l.until } : null);
 
+    if (path.startsWith('v/') && req.method === 'GET') {
+      const n = Number(path.slice(2));
+      const v = meta.versions.find((x) => x.n === n);
+      if (!v) return json({ error: 'not found' }, 404);
+      const data = await this.getBlob(n, v.chunks, v.size);
+      if (!data) return json({ error: 'not found' }, 404);
+      return new Response(data, { headers: { 'Content-Type': 'application/octet-stream', 'Cache-Control': 'private, max-age=31536000, immutable' } });
+    }
+
     if (path === '' && req.method === 'GET') {
       return json({ versions: meta.versions, lock: lockInfo(await this.activeLock()), created: meta.created });
     }
@@ -175,19 +205,20 @@ export class DocRoom {
       if (cur && cur.lockId !== req.headers.get('X-Lock-Id')) return json({ error: 'locked', lock: lockInfo(cur) }, 409);
       const max = Number(this.env.MAX_BYTES);
       const len = Number(req.headers.get('Content-Length') || 0);
-      if (len > max) return json({ error: 'too large', message: '문서가 너무 큽니다(최대 50MB)' }, 413);
+      const tooBig = { error: 'too large', message: `문서가 너무 큽니다(최대 ${Math.round(max / 1048576)}MB)` };
+      if (len > max) return json(tooBig, 413);
       const buf = await req.arrayBuffer();
-      if (buf.byteLength > max) return json({ error: 'too large', message: '문서가 너무 큽니다(최대 50MB)' }, 413);
+      if (buf.byteLength > max) return json(tooBig, 413);
       if (buf.byteLength < 28) return json({ error: 'empty' }, 400);
       const n = meta.next;
-      await this.env.DOCS.put(`d/${meta.id}/${n}`, buf);
+      const chunks = await this.putBlob(n, buf);
       const by = (req.headers.get('X-Author') || '').slice(0, AUTHOR_MAX);
-      meta.versions.push({ n, at: now, size: buf.byteLength, by });
+      meta.versions.push({ n, at: now, size: buf.byteLength, by, chunks });
       meta.next = n + 1;
       const keep = Number(this.env.KEEP_VERSIONS);
       while (meta.versions.length > keep) {
         const old = meta.versions.shift();
-        await this.env.DOCS.delete(`d/${meta.id}/${old.n}`);
+        await this.delBlob(old.n, old.chunks);
       }
       await this.state.storage.put('meta', meta);
       if (cur) await this.state.storage.put('lock', { ...cur, until: now + Number(this.env.LOCK_SECONDS) * 1000 });
@@ -197,7 +228,6 @@ export class DocRoom {
 
     if (path === '' && req.method === 'DELETE') {
       if (!(await this.authorized(req, meta))) return json({ error: 'forbidden' }, 403);
-      for (const v of meta.versions) await this.env.DOCS.delete(`d/${meta.id}/${v.n}`);
       this.broadcast({ type: 'deleted' });
       for (const ws of this.state.getWebSockets()) { try { ws.close(1000, 'deleted'); } catch { /* 무시 */ } }
       await this.state.storage.deleteAll();
