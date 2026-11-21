@@ -51,6 +51,30 @@
     };
   }
 
+  // ---- 서식 줄 글꼴 메뉴(rhwp 모양 그대로): "공공누리" 분류와 표시 ----
+  var families = [];
+  var seenFam = new Set();
+  fonts.forEach(function (f) { if (!seenFam.has(f.family)) { seenFam.add(f.family); families.push(f.family); } });
+  window.__koglMenu = function () { return families.map(function (n) { return { value: n, label: n }; }); };
+  var MARK = '<svg viewBox="0 0 10 10" aria-hidden="true"><circle cx="5" cy="5" r="4.3" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M3 5.2l1.4 1.4L7.2 3.7" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  window.__koglBadge = function (btn, value) {
+    var list = typeof value === 'string' ? names.get(value.toLowerCase()) : null;
+    if (!list) return;
+    var label = btn.textContent;
+    btn.textContent = '';
+    btn.classList.add('kogl-opt');
+    var n = document.createElement('span'); n.className = 'kogl-name'; n.textContent = label;
+    var b = document.createElement('span'); b.className = 'kogl-badge'; b.innerHTML = MARK + '공공누리';
+    btn.append(n, b);
+    btn.title = label + '\n공공누리 제1유형 · 출처표시\n저작권자: ' + (list[0].owner || '');
+  };
+  css.push('.font-picker-option.kogl-opt{display:flex;align-items:center;gap:6px}' +
+    '.kogl-opt .kogl-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}' +
+    '.kogl-badge{flex:none;display:inline-flex;align-items:center;gap:2px;border:1px solid #2f6fd6;color:#2f6fd6;border-radius:3px;font-size:10px;font-weight:700;line-height:1;padding:2px 4px 2px 3px;background:#fff}' +
+    '.kogl-badge svg{width:9px;height:9px;display:block}');
+  var st0 = document.getElementById('kogl-font-faces');
+  if (st0) st0.textContent = css.join('\n');
+
   // rhwp가 "쓸 수 있는 글꼴인가"를 물을 때 공공누리 글꼴이면 예 (tools/patch-studio.mjs가 넣은 호출)
   window.__koglHas = function (name) { return typeof name === 'string' && names.has(name.toLowerCase()); };
 

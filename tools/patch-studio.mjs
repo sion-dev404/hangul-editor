@@ -37,6 +37,26 @@ if (!src.includes(MARK2)) {
   console.log('넣음: 글꼴 사용 가능 판단');
 }
 
+// 서식 줄 글꼴 메뉴(rhwp 자체 모양 그대로)에 공공누리를 넣는다
+//  - 분류 단추 맨 뒤에 "공공누리", "전체"에도 공공누리 글꼴 포함
+//  - 목록에서 공공누리 글꼴 옆에 표시(window.__koglBadge)
+const MARK3 = 'window.__koglMenu?window.__koglMenu():[]';
+if (!src.includes(MARK3)) {
+  const reCat = /(\w+=\[\{id:`all`,label:\w+\(`[^`]+`\)\}(?:,\{id:`\w+`,label:\w+\(`[^`]+`\)\})*,\{id:`system`,label:\w+\(`[^`]+`\)\})\]/;
+  const reAll = /(case`all`:return this\.uniqueFontMenuEntries\(\[[^\]]*?)\]\)/;
+  const reCase = /(getFontMenuEntries\(e\)\{[^]*?switch\(e\)\{)/;
+  const reOpt = /t\.textContent=e\.label,t\.title=e\.label,/;
+  for (const [n, re] of [['분류 목록', reCat], ['전체 분류', reAll], ['분류별 목록', reCase], ['목록 항목', reOpt]]) {
+    if (!re.test(src)) throw new Error(`rhwp 글꼴 메뉴의 ${n} 코드를 찾지 못했습니다 (tools/patch-studio.mjs를 고쳐야 합니다)`);
+  }
+  src = src.replace(reCat, '$1,...(window.__koglMenu?[{id:`kogl`,label:`공공누리`}]:[])]');
+  src = src.replace(reAll, `$1,...(${MARK3})])`);
+  src = src.replace(reCase, `$1case\`kogl\`:return ${MARK3};`);
+  src = src.replace(reOpt, 't.textContent=e.label,t.title=e.label,window.__koglBadge&&window.__koglBadge(t,e.value),');
+  fs.writeFileSync(p, src);
+  console.log('넣음: 글꼴 메뉴 공공누리 분류·표시');
+}
+
 // kogl-hook.js를 rhwp 본체보다 먼저 읽게 한다
 const hook = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/(\w:)/, '$1')), 'studio-kogl-hook.js');
 fs.copyFileSync(hook, path.join(dir, 'kogl-hook.js'));

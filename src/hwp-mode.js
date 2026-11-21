@@ -2,10 +2,8 @@
 import { createStudio } from '@rhwp/editor';
 import { icon } from './icons.js';
 import { putRecovery, getRecovery, delRecovery, clock } from './recovery.js';
-import { loadFontPack } from './fonts.js';
-import { addKoglGroup, attachFontPicker } from './fontpicker.js';
-// 공공누리 글꼴의 한글 화면 연결: 그리기는 studio/kogl-hook.js + tools/patch-studio.mjs가 맡고,
-// 여기서는 서식 줄 글꼴 상자(#font-name)에 공공누리 묶음과 표시가 붙는 목록을 단다.
+// 공공누리 글꼴의 한글 화면 연결(그리기, 서식 줄 글꼴 메뉴의 "공공누리" 분류·표시)은
+// studio/kogl-hook.js + tools/patch-studio.mjs가 rhwp 안에서 맡는다. 메뉴 모양은 rhwp 그대로 둔다.
 
 const $ = (s, r = document) => r.querySelector(s);
 const host = $('#studioHost');
@@ -142,17 +140,6 @@ async function ensureStudio() {
         const st = d.createElement('style');
         st.textContent = '#menu-bar, #icon-toolbar { display: none !important; }';
         d.head.append(st);
-        const sel = d.getElementById('font-name');
-        if (sel) {
-          loadFontPack().then((pack) => {
-            if (pack) {
-              addKoglGroup(sel, pack);
-              // rhwp가 문서를 열 때 상자를 다시 채우면 묶음을 다시 붙인다
-              new MutationObserver(() => addKoglGroup(sel, pack)).observe(sel, { childList: true });
-            }
-            attachFontPicker(sel, pack, { more: { label: 'PC 글꼴 · 분류별 보기…' } });
-          });
-        }
       } catch { await s.chrome.set({ menu: false }).catch(() => {}); }
       await s.commands.execute('view:theme-light').catch(() => {});
       studio = s;
