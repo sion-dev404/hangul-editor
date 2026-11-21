@@ -106,6 +106,12 @@ const RIBBON = [
       { c: 'view:zoom-out', i: 'zoomout', l: '축소' }, { c: 'view:zoom-in', i: 'zoomin', l: '확대' },
       { c: 'view:zoom-100', i: 'zoom100', l: '100%' }, { c: 'view:zoom-fit-width', i: 'zoomfit', l: '폭 맞춤' }, { c: 'view:zoom-fit-page', i: 'zoomfitpage', l: '쪽 맞춤' },
     ] },
+    { label: '쪽 보기', big: [
+      { c: 'view:arrange', p: { arrangement: { kind: 'single' }, zoomChoice: { kind: 'fitWidth' } }, i: 'pages1', l: '한 쪽' },
+      { c: 'view:arrange', p: { arrangement: { kind: 'multiple', columns: 2, rows: 1 } }, i: 'pages2', l: '두 쪽' },
+      { c: 'view:arrange', p: { arrangement: { kind: 'multiple', columns: 3, rows: 1 } }, i: 'pages3', l: '세 쪽' },
+      { c: 'view:zoom-dialog', i: 'pagesmany', l: '여러 쪽…' },
+    ] },
     { label: '표시', rows: [
       [{ c: 'view:para-mark', l: '문단 부호' }],
     ] },
@@ -113,7 +119,7 @@ const RIBBON = [
 ];
 
 function btnHtml(b, big) {
-  const attr = b.c ? `data-hcmd="${b.c}"` : `data-hact="${b.a}"`;
+  const attr = (b.c ? `data-hcmd="${b.c}"` : `data-hact="${b.a}"`) + (b.p ? ` data-hp='${JSON.stringify(b.p)}'` : '');
   const extra = b.desktopOnly ? ' data-desktop-only hidden' : '';
   if (big) return `<button class="big" ${attr}${extra}><i>${icon(b.i)}</i>${b.l}${b.s ? `<small>${b.s}</small>` : ''}</button>`;
   if (b.sq) return `<button class="sq" ${attr} title="${b.t}">${b.sq}</button>`;
@@ -169,10 +175,10 @@ async function refreshEnabled() {
   } catch { /* 무시 */ }
 }
 
-async function runCommand(id) {
+async function runCommand(id, params) {
   try {
     const s = await ensureStudio();
-    const r = await s.commands.execute(id, undefined, { allowDialog: true });
+    const r = await s.commands.execute(id, params, { allowDialog: true });
     if (r && r.ok === false && r.reason !== 'disabled') ctx.toast(r.message || '지금은 쓸 수 없는 기능입니다');
     if (r && r.ok === false && r.reason === 'disabled') ctx.toast('지금 위치에서는 쓸 수 없는 기능입니다');
   } catch (e) {
@@ -376,7 +382,7 @@ export function initHwp(context) {
   const onClick = (e) => {
     const b = e.target.closest('button');
     if (!b || b.disabled) return;
-    if (b.dataset.hcmd) runCommand(b.dataset.hcmd);
+    if (b.dataset.hcmd) runCommand(b.dataset.hcmd, b.dataset.hp ? JSON.parse(b.dataset.hp) : undefined);
     else if (b.dataset.hact && ACTS[b.dataset.hact]) ACTS[b.dataset.hact]();
   };
   ribbonEl.addEventListener('click', onClick);

@@ -57,6 +57,20 @@ if (!src.includes(MARK3)) {
   console.log('넣음: 글꼴 메뉴 공공누리 분류·표시');
 }
 
+// 여러 쪽 보기: rhwp의 확대 창(view:zoom-dialog)이 확인 때 하는 일을 그대로 하는 명령 view:arrange를 더한다.
+// 매개변수 { arrangement: {kind:'single'} | {kind:'multiple',columns,rows}, zoomChoice?: {kind:'fitWidth'|'fitPage'} }
+const MARK4 = 'id:`view:arrange`';
+if (!src.includes(MARK4)) {
+  const reZoom = /id:`view:zoom-dialog`,[^]*?execute\(e\)\{let t=e\.getViewportManager\(\);if\(!t\)return;let n=(\w+)\.getViewSettings\(\)[^]*?onConfirm\(t\)\{([^]*?e\.eventBus\.emit\(`command-state-changed`\))\}\}\)\.show\(\)\}\}/;
+  const m4 = src.match(reZoom);
+  if (!m4) throw new Error('rhwp 확대 창 명령 코드를 찾지 못했습니다 (tools/patch-studio.mjs를 고쳐야 합니다)');
+  const [all, S, body] = m4;
+  const cmd = `,{${MARK4},label:\`쪽 배치\`,canExecute:e=>e.hasDocument,execute(e,p){if(!p||!p.arrangement)return;let t={zoomChoice:p.zoomChoice||{kind:\`fitPage\`},arrangement:p.arrangement,pageMovement:${S}.getViewSettings().pageMovement};${body}}}`;
+  src = src.replace(all, all + cmd);
+  fs.writeFileSync(p, src);
+  console.log('넣음: 쪽 배치 명령(view:arrange)');
+}
+
 // kogl-hook.js를 rhwp 본체보다 먼저 읽게 한다
 const hook = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/(\w:)/, '$1')), 'studio-kogl-hook.js');
 fs.copyFileSync(hook, path.join(dir, 'kogl-hook.js'));

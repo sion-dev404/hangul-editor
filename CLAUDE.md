@@ -33,6 +33,7 @@
   - `tools/patch-studio.mjs`가 rhwp 코드(`public/studio/assets/index-*.js`, 압축된 이름)의 그 판단(`u=…||In.has(e)||…`)에 `window.__koglHas(e)`를, CanvasKit용 글꼴 표 함수 맨 앞에 `window.__koglTn(표,이름정리)`를 넣고, `kogl-hook.js`를 `index.html`·`print.html`에 넣는다. `install-studio.ps1`이 자동 실행한다. rhwp 버전이 바뀌면 정규식이 안 맞아 오류로 멈추니 그때 고친다.
   - `tools/studio-kogl-hook.js`(→ `public/studio/kogl-hook.js`)는 manifest를 동기로 읽고 @font-face를 선언한 뒤, Canvas가 공공누리 글꼴 이름을 처음 쓰면 `document.fonts.load()`로 받는다. 받기가 끝나면 rhwp가 `loadingdone`에서 글자 폭을 다시 재고 다시 그린다. 인쇄 창은 `document.fonts.ready`를 기다린 뒤 인쇄한다.
 - 글꼴 상자: 한글 화면은 **rhwp 글꼴 메뉴 모양 그대로** 두고, `patch-studio.mjs`가 분류 단추 맨 뒤에 "공공누리"(`window.__koglMenu`)를 더하고 "모든 글꼴"에도 넣으며, 목록 항목에 `window.__koglBadge`로 공공누리 표시를 붙인다(사용자 지시: 한글의 글꼴 창 디자인 유지). 워드 화면은 기본 상자에 그림을 넣을 수 없어 `src/fontpicker.js`의 목록을 쓴다.
+- 여러 쪽 보기: rhwp 화면에는 쪽 배치(single·double·facing·multiple·auto)가 이미 있으나 확대 창에만 숨어 있다. `patch-studio.mjs`가 확대 창 확인 동작을 복제한 명령 `view:arrange`(매개변수 `{arrangement, zoomChoice?}`)를 더하고, 보기 탭 "쪽 보기"의 한 쪽/두 쪽/세 쪽 단추가 `data-hp`(JSON 매개변수)로 부른다. 워드 화면은 쪽 나누기 화면이 없어 아직 없음.
 - 출처 표시: 파일 탭의 "글꼴 출처"가 `출처표시.txt`를 연다.
 
 ## 설치 프로그램 (우리 디자인)
