@@ -54,6 +54,11 @@
 - 개발: `cd cloud && npx wrangler dev --port 8787` + 개발 서버(5173·5198·5199)면 로컬 서버를 쓴다. 시험: `node cloud/test/api-test.mjs`(보안 시험 포함).
 - 배포: `cd cloud && npx wrangler deploy` (계정 gemisionkim@gmail.com, Google Cloud 프로젝트 hangle-aditor). 서버 배포는 git push와 별개.
 
+## 버전 규칙
+- 3.x = 클라우드 세대: 혼자 쓰는 편집기(2.x)에서 우리 서버·Google 로그인·공유·편집 잠금·버전 기록·내 문서함·자체 설치 프로그램을 갖춘 문서 서비스로 바뀐 세대.
+- 3.0 = 클라우드 출발(2.7.0의 클라우드·로그인·공유에 해당), 3.1.0 = 내 문서함(비밀번호 없이 어느 PC에서나)과 다른 PC 편집 넘겨받기(2.8.0과 같은 내용을 3.x 체계로 다시 냄).
+- 앞으로: 기능 추가 = 가운데 숫자(3.2.0), 고침만 = 끝 숫자(3.1.1), 세대가 바뀔 만큼 큰 변화 = 앞 숫자.
+
 ## 명령
 - 개발 서버: `npm run dev`
 - 설치 파일: `npm run dist` → `release/HangulEditor-Setup-<버전>.exe` (설치 화면만 다시 만들 때: `npm run setup`, 화면 그림만 뽑기: `node tools/make-setup.mjs --snap=<폴더>`)
