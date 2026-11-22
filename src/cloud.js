@@ -68,9 +68,203 @@ export const user = () => auth?.user || null;
 const myName = () => auth?.user?.name || auth?.user?.email || '이름 없음';
 
 let loginWait = null;
-// 로그인: 브라우저(웹판은 작은 창, 설치형은 기본 브라우저)에서 Google 로그인 → 1회용 코드 → 세션
-export async function login() {
-  if (!API) { ctx.toast('클라우드 서버가 아직 준비되지 않았습니다'); return false; }
+// 로그인 창(아이디 로그인 · 회원가입 · 비밀번호 찾기 · Google). 로그인하면 true, 닫으면 false.
+export function login() {
+  if (!API) { ctx.toast('클라우드 서버가 아직 준비되지 않았습니다'); return Promise.resolve(false); }
+  if (auth) return Promise.resolve(true);
+  return new Promise((resolve) => loginDialog(resolve));
+}
+// 로그인이 끝난 뒤 공통: 프로필을 받고, 약관에 아직 동의하지 않았으면(Google 첫 로그인) 동의를 받는다
+async function afterLogin(r, how) {
+  saveAuth({ token: r.token, user: r.user });
+  await refreshMe();
+  if (auth && auth.user.agreed === false && !(await consentDialog())) { await logout(true); ctx.toast('동의하지 않아 로그인하지 않았습니다'); return false; }
+  if (!auth) return false;
+  ctx.toast(`${auth.user.name || auth.user.email}님, ${how}`);
+  if (s) await refreshRights();
+  return true;
+}
+async function refreshMe() {
+  if (!auth) return;
+  try {
+    const res = await call('/api/me');
+    if (!res.ok) return;
+    const me = await jsonOf(res);
+    saveAuth({ token: auth.token, user: { email: me.email, name: me.name, kind: me.kind, avatar: me.avatar, agreed: me.agreed } });
+  } catch { /* 다음에 */ }
+}
+const termsUrl = () => `${API}/terms`;
+const privacyUrl = () => `${API}/privacy`;
+async function postJson(path, body) {
+  const res = await call(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  return { res, r: await jsonOf(res) };
+}
+
+function loginDialog(resolve, start = 'login') {
+  let done = false;
+  const finish = (v) => { if (!done) { done = true; resolve(v); } };
+  const body = el(`<div class="tabs"><button data-tab="login">로그인</button><button data-tab="signup">회원가입</button></div>
+    <div data-pane="login">
+      <label class="f">아이디<input data-u autocomplete="username" autocapitalize="off" spellcheck="false"></label>
+      <label class="f">비밀번호<input data-p type="password" autocomplete="current-password"></label>
+      <div class="err" data-err></div>
+      <button class="btn wide" data-go>로그인</button>
+      <div class="links"><button class="lnk" data-forgot>비밀번호를 잊었어요</button><button class="lnk" data-tosign>처음이면 회원가입</button></div>
+      <div class="or"><span>또는</span></div>
+      <button class="btn g" data-google>${G_MARK} Google 계정으로 로그인</button>
+    </div>
+    <div data-pane="signup" hidden>
+      <label class="f">아이디 <small>영문 소문자로 시작, 4~20자 (영문 소문자·숫자·_)</small><input data-u autocomplete="username" autocapitalize="off" spellcheck="false" maxlength="20"></label>
+      <label class="f">비밀번호 <small>8자 이상, 영문과 숫자를 함께</small><input data-p type="password" autocomplete="new-password"></label>
+      <label class="f">비밀번호 확인<input data-p2 type="password" autocomplete="new-password"></label>
+      <label class="f">이름 <small>편집 중 표시에 쓰여요 (별명 가능)</small><input data-n maxlength="20"></label>
+      <label class="ck"><input type="checkbox" data-all> <b>모두 동의</b></label>
+      <label class="ck"><input type="checkbox" data-t1> (필수) <button class="lnk" data-terms>이용약관</button>에 동의합니다</label>
+      <label class="ck"><input type="checkbox" data-t2> (필수) <button class="lnk" data-privacy>개인정보 수집·이용</button>에 동의합니다</label>
+      <div class="err" data-err></div>
+      <button class="btn wide" data-go>가입하기</button>
+      <div class="note">메일 인증을 쓰지 않아요. 가입하면 <b>복구 코드</b>를 한 번 보여 드리니, 비밀번호를 잊을 때를 대비해 꼭 적어 두세요.</div>
+    </div>
+    <div data-pane="forgot" hidden>
+      <div style="margin-bottom:6px">가입할 때 받은 <b>복구 코드</b>로 새 비밀번호를 정합니다.</div>
+      <label class="f">아이디<input data-u autocomplete="username" autocapitalize="off" spellcheck="false"></label>
+      <label class="f">복구 코드<input data-c placeholder="XXXXX-XXXXX-XXXXX-XXXXX-XXXXX" autocapitalize="characters" spellcheck="false"></label>
+      <label class="f">새 비밀번호 <small>8자 이상, 영문과 숫자를 함께</small><input data-p type="password" autocomplete="new-password"></label>
+      <label class="f">새 비밀번호 확인<input data-p2 type="password" autocomplete="new-password"></label>
+      <div class="err" data-err></div>
+      <button class="btn wide" data-go>비밀번호 다시 정하기</button>
+      <div class="links"><button class="lnk" data-back>로그인으로 돌아가기</button></div>
+    </div>`);
+  const d = dialog('클라우드 계정', body);
+  let moving = false; // 성공해서 다음 단계로 넘어갈 때는 닫혀도 '취소'가 아니다
+  d.addEventListener('close', () => { if (!moving) finish(false); });
+  const panes = { login: d.querySelector('[data-pane=login]'), signup: d.querySelector('[data-pane=signup]'), forgot: d.querySelector('[data-pane=forgot]') };
+  const show = (name) => {
+    for (const [k, p] of Object.entries(panes)) p.hidden = k !== name;
+    d.querySelectorAll('[data-tab]').forEach((t) => t.classList.toggle('on', t.dataset.tab === name));
+    d.querySelector('.hd b').textContent = name === 'signup' ? '회원가입' : name === 'forgot' ? '비밀번호 찾기' : '클라우드 계정';
+    panes[name].querySelector('input')?.focus();
+  };
+  d.querySelectorAll('[data-tab]').forEach((t) => t.addEventListener('click', () => show(t.dataset.tab)));
+  d.querySelector('[data-forgot]').addEventListener('click', () => show('forgot'));
+  d.querySelector('[data-tosign]').addEventListener('click', () => show('signup'));
+  d.querySelector('[data-back]').addEventListener('click', () => show('login'));
+  d.querySelector('[data-terms]').addEventListener('click', (e) => { e.preventDefault(); window.open(termsUrl(), '_blank'); });
+  d.querySelector('[data-privacy]').addEventListener('click', (e) => { e.preventDefault(); window.open(privacyUrl(), '_blank'); });
+  const all = d.querySelector('[data-all]'); const t1 = d.querySelector('[data-t1]'); const t2 = d.querySelector('[data-t2]');
+  all.addEventListener('change', () => { t1.checked = t2.checked = all.checked; });
+  [t1, t2].forEach((c) => c.addEventListener('change', () => { all.checked = t1.checked && t2.checked; }));
+  d.querySelector('[data-google]').addEventListener('click', async () => {
+    moving = true; d.close(); finish(await loginGoogle());
+  });
+  // 한 번에 한 요청만
+  const busyRun = (pane, fn) => async () => {
+    const btn = pane.querySelector('[data-go]'); const err = pane.querySelector('[data-err]');
+    if (btn.disabled) return;
+    err.textContent = ''; btn.disabled = true;
+    try { const m = await fn(); if (m) err.textContent = m; } catch (e) { err.textContent = e.message || '잠시 뒤에 다시 해 주세요'; } finally { btn.disabled = false; }
+  };
+  const v = (pane, sel) => pane.querySelector(sel).value;
+  const P = panes;
+  const doLogin = busyRun(P.login, async () => {
+    const username = v(P.login, '[data-u]').trim(); const password = v(P.login, '[data-p]');
+    if (!username || !password) return '아이디와 비밀번호를 넣어 주세요';
+    const { res, r } = await postJson('/api/auth/login', { username, password });
+    if (!res.ok) return r.message || '로그인하지 못했습니다';
+    moving = true; d.close(); finish(await afterLogin(r, '반갑습니다'));
+    return null;
+  });
+  const doSignup = busyRun(P.signup, async () => {
+    const username = v(P.signup, '[data-u]').trim().toLowerCase(); const password = v(P.signup, '[data-p]');
+    if (!/^[a-z][a-z0-9_]{3,19}$/.test(username)) return '아이디는 영문 소문자로 시작하는 4~20자(영문 소문자·숫자·_)로 만들어 주세요';
+    if (password.length < 8 || !/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) return '비밀번호는 8자 이상, 영문과 숫자를 함께 넣어 주세요';
+    if (password !== v(P.signup, '[data-p2]')) return '비밀번호 확인이 맞지 않습니다';
+    if (!t1.checked || !t2.checked) return '필수 항목에 동의해 주세요';
+    const { res, r } = await postJson('/api/auth/signup', { username, password, nick: v(P.signup, '[data-n]').trim(), agree: true });
+    if (!res.ok) return r.message || '가입하지 못했습니다';
+    moving = true; d.close();
+    await recoveryCodeDialog(r.recovery, `@${username} 가입을 마쳤습니다`);
+    finish(await afterLogin(r, '가입을 환영합니다'));
+    return null;
+  });
+  const doRecover = busyRun(P.forgot, async () => {
+    const username = v(P.forgot, '[data-u]').trim(); const code = v(P.forgot, '[data-c]').trim(); const password = v(P.forgot, '[data-p]');
+    if (!username || !code) return '아이디와 복구 코드를 넣어 주세요';
+    if (password.length < 8 || !/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) return '새 비밀번호는 8자 이상, 영문과 숫자를 함께 넣어 주세요';
+    if (password !== v(P.forgot, '[data-p2]')) return '새 비밀번호 확인이 맞지 않습니다';
+    const { res, r } = await postJson('/api/auth/recover', { username, code, password });
+    if (!res.ok) return r.message || '되찾지 못했습니다';
+    moving = true; d.close();
+    await recoveryCodeDialog(r.recovery, '비밀번호를 새로 정했습니다. 쓴 복구 코드는 더는 쓸 수 없어 새 코드를 드립니다');
+    finish(await afterLogin(r, '비밀번호를 새로 정했습니다'));
+    return null;
+  });
+  const bind = (pane, fn) => {
+    pane.querySelector('[data-go]').addEventListener('click', fn);
+    pane.querySelectorAll('input:not([type=checkbox])').forEach((i) => i.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); fn(); } }));
+  };
+  bind(P.login, doLogin); bind(P.signup, doSignup); bind(P.forgot, doRecover);
+  show(start);
+}
+
+// 복구 코드는 한 번만 보여 준다. "적어 두었어요"를 눌러야 닫힌다.
+function recoveryCodeDialog(code, title) {
+  return new Promise((resolve) => {
+    const body = el(`<div>${esc(title)}.</div>
+      <div class="sec"><div class="t">복구 코드 <small>비밀번호를 잊었을 때 이 코드로만 되찾을 수 있어요</small></div>
+        <div class="code" data-code>${esc(code)}</div>
+        <div class="r" style="margin-top:8px"><button class="btn sub" data-copy>복사</button><button class="btn sub" data-file>파일로 저장</button></div></div>
+      <div class="note">⚠️ 이 코드는 <b>지금 한 번만</b> 보여 드립니다. 메일 인증이 없어서, 비밀번호와 이 코드를 모두 잃으면 계정을 되찾을 수 없어요. 종이에 적거나 안전한 곳에 저장해 두세요.</div>
+      <label class="ck" style="margin-top:12px"><input type="checkbox" data-ok> 복구 코드를 안전한 곳에 적어 두었어요</label>
+      <button class="btn wide" data-done disabled style="margin-top:8px">확인</button>`);
+    const d = dialog('복구 코드', body);
+    d.querySelector('.x').remove();
+    d.addEventListener('cancel', (e) => e.preventDefault()); // Esc로 닫지 않게
+    d.querySelector('[data-copy]').addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(code); ctx.toast('복구 코드를 복사했습니다'); } catch { ctx.toast('복사하지 못했습니다. 직접 적어 주세요'); }
+    });
+    d.querySelector('[data-file]').addEventListener('click', () => {
+      const who = auth?.user?.email || '';
+      const blob = new Blob([`한글 편집기 클라우드 복구 코드\r\n\r\n${who ? `계정: ${who}\r\n` : ''}복구 코드: ${code}\r\n만든 날: ${new Date().toLocaleString('ko-KR')}\r\n\r\n비밀번호를 잊었을 때 로그인 창의 "비밀번호를 잊었어요"에서 씁니다. 다른 사람에게 보여 주지 마세요.\r\n`], { type: 'text/plain;charset=utf-8' });
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = '한글편집기-복구코드.txt';
+      document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    });
+    const ok = d.querySelector('[data-ok]'); const done = d.querySelector('[data-done]');
+    ok.addEventListener('change', () => { done.disabled = !ok.checked; });
+    done.addEventListener('click', () => { d.close(); resolve(); });
+  });
+}
+
+// Google 회원의 첫 로그인: 이용약관·개인정보 동의
+function consentDialog() {
+  return new Promise((resolve) => {
+    const body = el(`<div>클라우드를 쓰려면 아래 내용에 동의해 주세요.</div>
+      <label class="ck" style="margin-top:12px"><input type="checkbox" data-all> <b>모두 동의</b></label>
+      <label class="ck"><input type="checkbox" data-t1> (필수) <button class="lnk" data-terms>이용약관</button>에 동의합니다</label>
+      <label class="ck"><input type="checkbox" data-t2> (필수) <button class="lnk" data-privacy>개인정보 수집·이용</button>에 동의합니다</label>
+      <div class="r" style="margin-top:12px;justify-content:flex-end"><button class="btn sub" data-no>동의하지 않음</button><button class="btn" data-yes disabled>동의하고 시작</button></div>`);
+    const d = dialog('약관 동의', body);
+    let answered = false;
+    const end = (v) => { if (!answered) { answered = true; resolve(v); } };
+    d.addEventListener('close', () => end(false));
+    const all = d.querySelector('[data-all]'); const t1 = d.querySelector('[data-t1]'); const t2 = d.querySelector('[data-t2]'); const yes = d.querySelector('[data-yes]');
+    const sync = () => { yes.disabled = !(t1.checked && t2.checked); all.checked = t1.checked && t2.checked; };
+    all.addEventListener('change', () => { t1.checked = t2.checked = all.checked; sync(); });
+    [t1, t2].forEach((c) => c.addEventListener('change', sync));
+    d.querySelector('[data-terms]').addEventListener('click', (e) => { e.preventDefault(); window.open(termsUrl(), '_blank'); });
+    d.querySelector('[data-privacy]').addEventListener('click', (e) => { e.preventDefault(); window.open(privacyUrl(), '_blank'); });
+    d.querySelector('[data-no]').addEventListener('click', () => d.close());
+    yes.addEventListener('click', async () => {
+      const { res } = await postJson('/api/account/agree', {});
+      if (!res.ok) { ctx.toast('동의를 기록하지 못했습니다'); return; }
+      auth.user.agreed = true; saveAuth(auth);
+      end(true); d.close();
+    });
+  });
+}
+
+// Google 로그인: 브라우저(웹판은 작은 창, 설치형은 기본 브라우저)에서 Google 로그인 → 1회용 코드 → 세션
+async function loginGoogle() {
   if (loginWait) return loginWait;
   loginWait = (async () => {
     const verifier = b64u(crypto.getRandomValues(new Uint8Array(32)));
@@ -98,19 +292,16 @@ export async function login() {
     const res = await fetch(`${API}/api/auth/exchange`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, verifier }) });
     const r = await res.json().catch(() => ({}));
     if (!res.ok || !r.token) { ctx.toast('로그인하지 못했습니다'); return false; }
-    saveAuth({ token: r.token, user: r.user });
-    ctx.toast(`${r.user.email}(으)로 로그인했습니다`);
-    if (s) await refreshRights();
-    return true;
+    return afterLogin(r, '로그인했습니다');
   })().finally(() => { loginWait = null; });
   return loginWait;
 }
-export async function logout() {
+export async function logout(quiet = false) {
   if (s?.editing) await releaseLock();
   saveAuth(null);
   vaultOn = true;
   if (s) { s.canEdit = false; s.isOwner = false; refreshBar(); }
-  ctx.toast('로그아웃했습니다');
+  if (!quiet) ctx.toast('로그아웃했습니다');
 }
 
 /* ---------- 서버 ---------- */
@@ -122,7 +313,11 @@ async function call(path, opt = {}) {
   let res;
   try { res = await fetch(API + path, { method: opt.method || 'GET', headers, body: opt.body, keepalive: opt.keepalive }); }
   catch { throw new Error('클라우드에 연결하지 못했습니다. 인터넷 연결을 확인해 주세요'); }
-  if (res.status === 401 && auth) { saveAuth(null); } // 세션이 끝났다
+  if (res.status === 401 && auth) {
+    // 세션이 끝났다 (비밀번호가 틀렸다는 401은 세션과 관계없으니 로그인을 유지한다)
+    const j = await res.clone().json().catch(() => ({}));
+    if (j.error !== 'bad') saveAuth(null);
+  }
   return res;
 }
 const jsonOf = async (res) => { try { return await res.json(); } catch { return {}; } };
@@ -172,6 +367,30 @@ const CSS = `
 #cloudDlg td.acts{text-align:right;white-space:nowrap}
 #cloudDlg td.acts .btn{padding:5px 10px;font-size:12px}
 #cloudDlg .list{max-height:min(50vh,380px);overflow:auto}
+#cloudDlg{max-height:calc(100vh - 32px);overflow:auto}
+#cloudDlg .tabs{display:flex;gap:4px;border-bottom:1px solid #e1e5ea;margin:0 0 12px}
+#cloudDlg .tabs button{flex:1;border:0;background:none;padding:9px 0;font:inherit;font-weight:700;color:#5b6575;cursor:pointer;border-bottom:3px solid transparent}
+#cloudDlg .tabs button.on{color:#2f6fd6;border-bottom-color:#2f6fd6}
+#cloudDlg label.f{display:flex;flex-direction:column;gap:3px;margin-top:9px;font-weight:700;font-size:13px}
+#cloudDlg label.f small{font-weight:400;color:#5b6575}
+#cloudDlg label.f input{flex:none;font-weight:400;font-size:14px;padding:9px 10px}
+#cloudDlg label.ck{display:flex;align-items:center;gap:7px;margin-top:8px;cursor:pointer}
+#cloudDlg label.ck input{flex:none;width:17px;height:17px;margin:0}
+#cloudDlg .btn.wide{width:100%;margin-top:12px;padding:11px;font-size:14.5px}
+#cloudDlg .btn:disabled{opacity:.5;cursor:default}
+#cloudDlg .err{color:#c0392b;font-size:12.5px;min-height:0;margin-top:6px}
+#cloudDlg .err:empty{display:none}
+#cloudDlg .links{display:flex;justify-content:space-between;gap:10px;margin-top:10px;flex-wrap:wrap}
+#cloudDlg .lnk{border:0;background:none;padding:0;color:#2f6fd6;font:inherit;font-size:12.5px;cursor:pointer;text-decoration:underline}
+#cloudDlg label.ck .lnk{font-size:inherit}
+#cloudDlg .lnk.danger{color:#c0392b}
+#cloudDlg .or{display:flex;align-items:center;gap:10px;color:#8a93a3;font-size:12px;margin:14px 0 10px}
+#cloudDlg .or::before,#cloudDlg .or::after{content:"";flex:1;border-top:1px solid #e1e5ea}
+#cloudDlg .code{font:700 19px/1.4 Consolas,monospace;letter-spacing:1px;text-align:center;background:#f3f6fb;border:1px dashed #9db6dd;border-radius:10px;padding:14px 8px;user-select:all;word-break:break-all}
+#cloudDlg .who{display:flex;align-items:center;gap:10px;min-width:0}
+#cloudDlg .av{border-radius:50%;flex:none;object-fit:cover;background:#2f6fd6;color:#fff;display:inline-grid;place-items:center;font-weight:700}
+#cloudDlg ul.warn{margin:10px 0;padding-left:18px;color:#4a5363;font-size:12.5px}
+#cloudDlg ul.warn li{margin:3px 0}
 `;
 // Google 로고 대신 직접 그린 단순한 표시 (상표 그림은 쓰지 않는다)
 const G_MARK = '<svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="8" fill="none" stroke="#5b6575" stroke-width="1.6"/><text x="9" y="13" text-anchor="middle" font-size="10" font-weight="700" fill="#5b6575" font-family="Arial">G</text></svg>';
@@ -236,28 +455,134 @@ async function copy(text) {
   catch { ctx.toast('복사하지 못했습니다. 링크를 직접 선택해 복사해 주세요'); }
 }
 
-// 계정 (로그인·로그아웃)
-export function accountDialog() {
-  if (!auth) {
-    const body = el(`<div>클라우드에 문서를 올리고 고치려면 로그인해 주세요. 보기 링크는 로그인 없이 열 수 있어요.</div>
-      <div class="sec"><button class="btn g" data-login>${G_MARK} Google 계정으로 로그인</button></div>
-      <div class="note">🔒 비밀번호는 이 프로그램이나 우리 서버로 오지 않고 Google 화면에서만 입력합니다. 2단계 인증도 그대로 쓰입니다.</div>`);
-    const d = dialog('클라우드 계정', body);
-    d.querySelector('[data-login]').addEventListener('click', async () => { d.close(); if (await login()) accountDialog(); });
-    return;
-  }
-  const body = el(`<div class="me"><div><b>${esc(auth.user.name || '')}</b><br><small>${esc(auth.user.email)}</small></div><button class="btn sub" data-out>로그아웃</button></div>
+// 사진: 고른 그림을 가운데 정사각형으로 잘라 128px JPEG로 줄인다 (서버 한도 60KB 안쪽)
+function pickAvatar() {
+  return new Promise((resolve) => {
+    const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/png,image/jpeg,image/webp,image/gif';
+    inp.addEventListener('change', async () => {
+      const f = inp.files?.[0]; if (!f) { resolve(null); return; }
+      try {
+        const bmp = await createImageBitmap(f);
+        const side = Math.min(bmp.width, bmp.height);
+        const c = document.createElement('canvas'); c.width = c.height = 128;
+        const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, 128, 128);
+        g.drawImage(bmp, (bmp.width - side) / 2, (bmp.height - side) / 2, side, side, 0, 0, 128, 128);
+        let q = 0.85, url = c.toDataURL('image/jpeg', q);
+        while (url.length > 55000 && q > 0.3) { q -= 0.15; url = c.toDataURL('image/jpeg', q); }
+        resolve(url);
+      } catch { ctx.toast('그림을 읽지 못했습니다'); resolve(null); }
+    });
+    inp.click();
+  });
+}
+const avatarHtml = (u, size = 44) => (u.avatar
+  ? `<img class="av" src="${esc(u.avatar)}" width="${size}" height="${size}" alt="">`
+  : `<span class="av" style="width:${size}px;height:${size}px;font-size:${Math.round(size * 0.45)}px">${esc((u.name || u.email || '?').replace(/^@/, '').slice(0, 1).toUpperCase())}</span>`);
+
+// 계정 (로그인·프로필·비밀번호·탈퇴)
+export async function accountDialog() {
+  if (!auth) { if (await login()) accountDialog(); return; }
+  await refreshMe();
+  if (!auth) { accountDialog(); return; }
+  const u = auth.user; const isId = u.kind === 'id';
+  const body = el(`<div class="me"><div class="who">${avatarHtml(u)}<div><b>${esc(u.name || '')}</b><br><small>${esc(u.email)} · ${isId ? '아이디 회원' : 'Google 계정'}</small></div></div><button class="btn sub" data-out>로그아웃</button></div>
+    <div class="sec"><div class="t">프로필</div>
+      <div class="r"><input data-nick maxlength="20" placeholder="이름(별명)" value="${esc(u.name || '')}"><button class="btn sub" data-savenick>이름 바꾸기</button></div>
+      <div class="r" style="margin-top:6px"><button class="btn sub" data-photo>사진 고르기</button>${u.avatar ? '<button class="btn sub" data-nophoto>사진 빼기</button>' : ''}</div></div>
+    ${isId ? `<div class="sec"><div class="t">비밀번호·복구 코드</div>
+      <div class="r"><button class="btn sub" data-pw>비밀번호 바꾸기</button><button class="btn sub" data-code>복구 코드 새로 받기</button></div></div>` : ''}
     <div class="sec"><div class="t">내 문서함 <small>${vaultOn ? '켜짐' : '꺼짐'}</small></div>
       <div class="r"><div style="flex:1;color:#4a5363;font-size:12.5px">${vaultOn
         ? '어느 PC에서나 로그인하면 내 클라우드 문서 목록이 보입니다. 문서 열쇠는 서버 비밀키로 다시 잠가 보관하므로 저장소가 유출돼도 읽을 수 없지만, 서버 자체가 뚫리면 열릴 수 있습니다(한컴독스·구글 문서와 같은 수준).'
         : '꺼져 있어 문서 열쇠는 링크 안에만 있습니다. 서버도 문서를 열 수 없는 최고 보안이지만, 링크를 잃어버리면 다시 열 수 없습니다.'}</div>
       <button class="btn sub" data-vault>${vaultOn ? '끄기' : '켜기'}</button></div></div>
-    <div class="note">로그인은 30일 동안 유지됩니다. 공용 PC라면 다 쓴 뒤 꼭 로그아웃해 주세요.</div>`);
+    <div class="note">로그인은 30일 동안 유지됩니다. 공용 PC라면 다 쓴 뒤 꼭 로그아웃해 주세요.
+      <div class="links" style="margin-top:6px"><button class="lnk" data-terms>이용약관</button><button class="lnk" data-privacy>개인정보처리방침</button><button class="lnk danger" data-leave>회원 탈퇴</button></div></div>`);
   const d = dialog('클라우드 계정', body);
   d.querySelector('[data-out]').addEventListener('click', async () => { d.close(); await logout(); });
+  d.querySelector('[data-terms]').addEventListener('click', () => window.open(termsUrl(), '_blank'));
+  d.querySelector('[data-privacy]').addEventListener('click', () => window.open(privacyUrl(), '_blank'));
+  const putProfile = async (data, msg) => {
+    const res = await call('/api/account/profile', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+    const r = await jsonOf(res);
+    if (!res.ok) { ctx.toast(r.message || '바꾸지 못했습니다'); return; }
+    await refreshMe(); ctx.toast(msg); d.close(); accountDialog();
+  };
+  d.querySelector('[data-savenick]').addEventListener('click', () => {
+    const n = d.querySelector('[data-nick]').value.trim();
+    if (!n) { ctx.toast('이름을 넣어 주세요'); return; }
+    putProfile({ nick: n }, '이름을 바꿨습니다');
+  });
+  d.querySelector('[data-photo]').addEventListener('click', async () => { const a = await pickAvatar(); if (a) putProfile({ avatar: a }, '사진을 바꿨습니다'); });
+  d.querySelector('[data-nophoto]')?.addEventListener('click', () => putProfile({ avatar: null }, '사진을 뺐습니다'));
+  d.querySelector('[data-pw]')?.addEventListener('click', () => { d.close(); passwordDialog(); });
+  d.querySelector('[data-code]')?.addEventListener('click', () => { d.close(); newCodeDialog(); });
+  d.querySelector('[data-leave]').addEventListener('click', () => { d.close(); withdrawDialog(); });
   d.querySelector('[data-vault]').addEventListener('click', async () => {
     if (vaultOn && !confirm('내 문서함을 끄면 보관한 열쇠를 모두 지웁니다.\n다른 PC에서는 링크로만 열 수 있게 됩니다. 끌까요?')) return;
     if (await setVault(!vaultOn)) { d.close(); accountDialog(); }
+  });
+}
+
+function formDialog(title, html, run) {
+  const d = dialog(title, el(`${html}<div class="err" data-err></div><button class="btn wide" data-go>${title}</button>`));
+  const go = d.querySelector('[data-go]'); const err = d.querySelector('[data-err]');
+  const fire = async () => {
+    if (go.disabled) return;
+    err.textContent = ''; go.disabled = true;
+    try { const m = await run(d); if (m) err.textContent = m; } catch (e) { err.textContent = e.message || '잠시 뒤에 다시 해 주세요'; } finally { go.disabled = false; }
+  };
+  go.addEventListener('click', fire);
+  d.querySelectorAll('input:not([type=checkbox])').forEach((i) => i.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); fire(); } }));
+  d.querySelector('input')?.focus();
+  return d;
+}
+const pwOk = (p) => p.length >= 8 && /[A-Za-z]/.test(p) && /[0-9]/.test(p);
+function passwordDialog() {
+  formDialog('비밀번호 바꾸기', `<label class="f">지금 비밀번호<input data-o type="password" autocomplete="current-password"></label>
+    <label class="f">새 비밀번호 <small>8자 이상, 영문과 숫자를 함께</small><input data-p type="password" autocomplete="new-password"></label>
+    <label class="f">새 비밀번호 확인<input data-p2 type="password" autocomplete="new-password"></label>
+    <div class="note">바꾸면 다른 PC·브라우저의 로그인은 모두 끊기고, 이 화면만 로그인된 채로 남습니다.</div>`, async (d) => {
+    const old = d.querySelector('[data-o]').value; const password = d.querySelector('[data-p]').value;
+    if (!pwOk(password)) return '새 비밀번호는 8자 이상, 영문과 숫자를 함께 넣어 주세요';
+    if (password !== d.querySelector('[data-p2]').value) return '새 비밀번호 확인이 맞지 않습니다';
+    const res = await call('/api/account/password', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ old, password }) });
+    const r = await jsonOf(res);
+    if (!res.ok) return r.message || '바꾸지 못했습니다';
+    saveAuth({ ...auth, token: r.token });
+    d.close(); ctx.toast('비밀번호를 바꿨습니다. 다른 기기의 로그인은 끊겼습니다');
+    return null;
+  });
+}
+function newCodeDialog() {
+  formDialog('복구 코드 새로 받기', `<div>예전 복구 코드는 더는 쓸 수 없게 되고 새 코드가 나옵니다. 본인 확인을 위해 비밀번호를 넣어 주세요.</div>
+    <label class="f" style="margin-top:8px">비밀번호<input data-p type="password" autocomplete="current-password"></label>`, async (d) => {
+    const { res, r } = await postJson('/api/account/recovery', { password: d.querySelector('[data-p]').value });
+    if (!res.ok) return r.message || '받지 못했습니다';
+    d.close(); await recoveryCodeDialog(r.recovery, '새 복구 코드를 만들었습니다');
+    return null;
+  });
+}
+function withdrawDialog() {
+  const isId = auth?.user?.kind === 'id';
+  formDialog('회원 탈퇴', `<div><b>${esc(auth.user.email)}</b> 계정을 탈퇴합니다. 되돌릴 수 없어요.</div>
+    <ul class="warn">
+      <li>내가 <b>주인인 클라우드 문서</b>가 모든 버전과 함께 지워지고, 공유한 링크로도 더는 열 수 없습니다.</li>
+      <li>내 문서함·프로필${isId ? '·비밀번호·복구 코드' : ''}가 지워지고 모든 기기에서 로그아웃됩니다.</li>
+      ${isId ? '<li>이 아이디는 다른 사람이 옛 문서 권한을 얻지 못하도록 <b>다시 쓸 수 없습니다</b>.</li>' : '<li>나중에 같은 Google 계정으로 다시 로그인하면 빈 계정으로 새로 시작합니다.</li>'}
+      <li>필요한 문서는 먼저 내 PC에 저장해 두세요. 내 PC의 파일은 지워지지 않습니다.</li>
+    </ul>
+    ${isId ? '<label class="f">비밀번호<input data-p type="password" autocomplete="current-password"></label>' : ''}
+    <label class="ck"><input type="checkbox" data-ok> 위 내용을 확인했고 탈퇴합니다</label>`, async (d) => {
+    if (!d.querySelector('[data-ok]').checked) return '확인란을 눌러 주세요';
+    const res = await call('/api/account', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ confirm: true, password: d.querySelector('[data-p]')?.value || '' }) });
+    const r = await jsonOf(res);
+    if (!res.ok) return r.message || '탈퇴하지 못했습니다';
+    d.close();
+    if (s) { s.leaving = true; clearInterval(s.ping); clearInterval(s.beat); try { s.ws?.close(); } catch { /* 무시 */ } s = null; setHash(); refreshBar(); }
+    saveAuth(null); vaultOn = true;
+    ctx.toast(`탈퇴했습니다${r.removed ? ` (클라우드 문서 ${r.removed}개를 지웠습니다)` : ''}. 그동안 써 주셔서 고맙습니다`);
+    return null;
   });
 }
 
@@ -268,10 +593,10 @@ export async function shareDialog() {
   const body = el(`
     <div class="sec"><div class="t">문서 링크<small>링크가 있으면 누구나 볼 수 있어요</small></div>
       <div class="r"><input readonly value="${esc(linkOf())}"><button class="btn" data-copy>복사</button></div></div>
-    ${editors ? `<div class="sec"><div class="t">고칠 수 있는 사람<small>Google 계정 이메일 · 로그인해야 고칠 수 있어요</small></div>
+    ${editors ? `<div class="sec"><div class="t">고칠 수 있는 사람<small>회원 아이디 또는 Google 이메일 · 로그인해야 고칠 수 있어요</small></div>
       <div class="chips"><span class="chip" style="background:#e6f4ec">${esc(auth.user.email)} (주인)</span></div>
-      <div class="r" style="margin-top:8px"><input type="email" placeholder="함께 고칠 사람 이메일" data-email><button class="btn sub" data-add>추가</button></div></div>` : `
-      <div class="sec"><div class="t">고치기</div>${s.canEdit ? '이 문서를 고칠 수 있어요.' : '고치려면 문서 주인이 내 이메일을 추가해야 해요.'}</div>`}
+      <div class="r" style="margin-top:8px"><input placeholder="아이디(예: hong123) 또는 Google 이메일" data-email autocapitalize="off" spellcheck="false"><button class="btn sub" data-add>추가</button></div></div>` : `
+      <div class="sec"><div class="t">고치기</div>${s.canEdit ? '이 문서를 고칠 수 있어요.' : `고치려면 문서 주인이 내 ${auth?.user?.kind === 'id' ? `아이디(${esc(auth.user.email.slice(1))})` : '이메일'}를 추가해야 해요.`}</div>`}
     <div class="note">🔒 문서는 이 PC에서 잠가서 올립니다. ${vaultOn && auth
       ? '열쇠는 링크와 <b>내 문서함</b>(서버 비밀키로 다시 잠가 보관)에 있어, 어느 PC에서나 "내 문서"에서 다시 열 수 있어요.'
       : '열쇠는 링크의 <b>#</b> 뒤에만 있어 서버도 내용을 볼 수 없어요. 링크를 잃어버리면 다시 열 수 없으니 잘 보관하세요.'}</div>`);
@@ -299,8 +624,10 @@ export async function shareDialog() {
   render();
   const input = d.querySelector('[data-email]');
   const add = () => {
-    const v = input.value.trim().toLowerCase();
-    if (!/^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(v)) { ctx.toast('이메일 주소를 확인해 주세요'); return; }
+    let v = input.value.trim().toLowerCase();
+    if (/^@?[a-z][a-z0-9_]{3,19}$/.test(v)) v = v.startsWith('@') ? v : `@${v}`; // 회원 아이디
+    else if (!/^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(v)) { ctx.toast('회원 아이디나 이메일 주소를 확인해 주세요'); return; }
+    if (v === auth.user.email) { ctx.toast('나는 이미 주인입니다'); return; }
     input.value = '';
     update([...new Set([...editors, v])]);
   };

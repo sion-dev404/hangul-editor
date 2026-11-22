@@ -128,5 +128,101 @@ ok(!!lt.lockId && lt.lockId !== la.lockId, '같은 계정(다른 PC)은 넘겨�
 ok((await req(D2 + '/lock', { method: 'POST', body: JSON.stringify({ by: 'A', lockId: la.lockId }) }, A.token)).status === 409, '넘겨준 쪽(PC1)의 잠금 연장은 거절');
 await req(D2, { method: 'DELETE' }, A.token);
 ws.close();
+
+// ---- 아이디 회원가입 ----
+const post = (path, body, token) => req(path, { method: 'POST', body: JSON.stringify(body) }, token);
+const uid = 'hong' + Date.now().toString(36).slice(-6);
+const PW = 'Sejong1443ok';
+ok((await post('/api/auth/signup', { username: uid, password: 'short1', agree: true })).status === 400, '짧은 비밀번호 거절');
+ok((await post('/api/auth/signup', { username: uid, password: 'abcdefghij', agree: true })).status === 400, '숫자 없는 비밀번호 거절');
+ok((await post('/api/auth/signup', { username: uid, password: `${uid}99x`, agree: true })).status === 400, '아이디가 든 비밀번호 거절');
+ok((await post('/api/auth/signup', { username: 'Ab', password: PW, agree: true })).status === 400, '잘못된 아이디 형식 거절');
+ok((await post('/api/auth/signup', { username: 'admin', password: PW, agree: true })).status === 400, '예약된 아이디 거절');
+ok((await post('/api/auth/signup', { username: uid, password: PW })).status === 400, '약관 동의 없이 가입 거절');
+const su = await post('/api/auth/signup', { username: uid, password: PW, nick: '홍길동<script>', agree: true });
+const S = await su.json();
+ok(su.status === 201 && S.token && S.user.email === '@' + uid && /^[0-9A-Z]{5}(-[0-9A-Z]{5}){4}$/.test(S.recovery), `가입 성공 (@${uid}, 복구 코드 ${S.recovery})`);
+ok(S.user.name === '홍길동script', `이름에서 꺾쇠 제거 (${S.user.name})`);
+ok((await post('/api/auth/signup', { username: uid.toUpperCase(), password: PW, agree: true })).status === 409, '같은 아이디(대문자) 다시 가입 거절');
+const meS = await (await req('/api/me', {}, S.token)).json();
+ok(meS.email === '@' + uid && meS.kind === 'id' && meS.agreed === true, '/api/me: 아이디 회원');
+
+ok((await post('/api/auth/login', { username: uid, password: 'Wrong1234' })).status === 401, '틀린 비밀번호 로그인 거절');
+const lg = await (await post('/api/auth/login', { username: '@' + uid.toUpperCase(), password: PW })).json();
+ok(!!lg.token && lg.user.name === '홍길동script', '아이디(@·대문자 섞임)로 로그인');
+ok((await post('/api/auth/login', { username: 'nobody_here', password: PW })).status === 401, '없는 아이디 로그인 거절(같은 안내)');
+
+// 아이디 회원을 편집자로
+const c3 = await (await req('/api/docs', { method: 'POST' }, A.token)).json();
+const D3 = '/api/docs/' + c3.id;
+const e1 = await req(D3 + '/editors', { method: 'PUT', body: JSON.stringify({ editors: ['@nosuchuser9'] }) }, A.token);
+ok(e1.status === 400, '없는 @아이디를 편집자로 넣기 거절');
+const e2 = await (await req(D3 + '/editors', { method: 'PUT', body: JSON.stringify({ editors: ['@' + uid, 'b@test.kr'] }) }, A.token)).json();
+ok(JSON.stringify(e2.editors) === JSON.stringify(['@' + uid, 'b@test.kr']), `@아이디 편집자 지정 (${JSON.stringify(e2.editors)})`);
+ok((await (await req(D3, {}, lg.token)).json()).you.canEdit === true, '아이디 회원이 편집 권한 받음');
+const forgedId = S.token.split('.'); forgedId[1] = b64u(JSON.stringify({ sub: 'id:x', email: '@' + uid, name: 'x', kind: 'id', tv: 0, exp: Date.now() + 1e9 }));
+ok((await req('/api/me', {}, forgedId.join('.'))).status === 401, '아이디 회원 세션 위조 거절');
+
+// 프로필
+const pr = await req('/api/account/profile', { method: 'PUT', body: JSON.stringify({ nick: '길동', avatar: 'data:image/png;base64,iVBORw0KGgo=' }) }, S.token);
+ok(pr.status === 200 && (await (await req('/api/me', {}, S.token)).json()).name === '길동', '별명·사진 바꾸기');
+ok((await req('/api/account/profile', { method: 'PUT', body: JSON.stringify({ avatar: 'javascript:alert(1)' }) }, S.token)).status === 400, '사진 아닌 값 거절');
+ok((await req('/api/account/profile', { method: 'PUT', body: JSON.stringify({ avatar: 'data:image/png;base64,' + 'A'.repeat(70000) }) }, S.token)).status === 400, '너무 큰 사진 거절');
+
+// 비밀번호 바꾸기 → 예전 로그인 모두 끊김
+const PW2 = 'Hangul2026new';
+ok((await req('/api/account/password', { method: 'PUT', body: JSON.stringify({ old: 'Wrong1234', password: PW2 }) }, S.token)).status === 401, '지금 비밀번호 틀리면 변경 거절');
+const ch = await (await req('/api/account/password', { method: 'PUT', body: JSON.stringify({ old: PW, password: PW2 }) }, S.token)).json();
+ok(!!ch.token, '비밀번호 바꾸기');
+ok((await req('/api/me', {}, S.token)).status === 401 && (await req('/api/me', {}, lg.token)).status === 401, '바꾼 뒤 다른 기기의 예전 로그인 끊김');
+ok((await req('/api/me', {}, ch.token)).status === 200, '새 로그인 표는 유효');
+ok((await post('/api/auth/login', { username: uid, password: PW })).status === 401, '예전 비밀번호로 로그인 불가');
+
+// 복구 코드로 되찾기
+ok((await post('/api/auth/recover', { username: uid, code: 'AAAAA-AAAAA-AAAAA-AAAAA-AAAAA', password: 'Recover2026x' })).status === 401, '틀린 복구 코드 거절');
+const rc = await (await post('/api/auth/recover', { username: uid, code: S.recovery.toLowerCase().replace(/-/g, ' '), password: 'Recover2026x' })).json();
+ok(!!rc.token && rc.recovery && rc.recovery !== S.recovery, '복구 코드(소문자·띄어쓰기)로 되찾기 → 새 복구 코드');
+ok((await req('/api/me', {}, ch.token)).status === 401, '되찾은 뒤 예전 로그인 끊김');
+ok((await post('/api/auth/recover', { username: uid, code: S.recovery, password: 'Again2026xx' })).status === 401, '쓴 복구 코드는 다시 못 씀');
+
+// 연속 실패 잠금 (위에서 복구 실패 2번 포함 → 처음부터 다시 셈: 성공하면 0)
+const uid2 = 'kim' + Date.now().toString(36).slice(-6);
+await post('/api/auth/signup', { username: uid2, password: PW, agree: true });
+let st5 = [];
+for (let i = 0; i < 6; i++) st5.push((await post('/api/auth/login', { username: uid2, password: 'Nope12345' })).status);
+const lockRes = await post('/api/auth/login', { username: uid2, password: PW });
+ok(st5.slice(0, 4).every((x) => x === 401) && st5[5] === 429 && lockRes.status === 429, `5번 틀리면 잠금, 맞는 비밀번호도 잠시 거절 (${st5.join(',')},${lockRes.status})`);
+
+// 회원 탈퇴
+const R = rc.token;
+const c4 = await (await req('/api/docs', { method: 'POST' }, R)).json();
+const D4 = '/api/docs/' + c4.id;
+const l4 = await (await req(D4 + '/lock', { method: 'POST', body: JSON.stringify({ by: 'R' }) }, R)).json();
+await req(D4, { method: 'PUT', headers: { 'X-Lock-Id': l4.lockId }, body }, R);
+await req('/api/mydocs/' + c4.id, { method: 'PUT', body: JSON.stringify({ key: K, name: '내 글.hwp', format: 'hwp', role: 'owner' }) }, R);
+ok((await req('/api/account', { method: 'DELETE', body: JSON.stringify({ confirm: true, password: 'Wrong1234' }) }, R)).status === 401, '비밀번호 틀리면 탈퇴 거절');
+ok((await req('/api/account', { method: 'DELETE', body: JSON.stringify({ password: 'Recover2026x' }) }, R)).status === 400, '확인 없이 탈퇴 거절');
+const del = await (await req('/api/account', { method: 'DELETE', body: JSON.stringify({ confirm: true, password: 'Recover2026x' }) }, R)).json();
+ok(del.ok && del.removed === 1, `탈퇴 → 내가 주인인 문서 ${del.removed}개 지움`);
+ok((await req(D4)).status === 404, '탈퇴한 회원의 문서는 없어짐');
+ok((await req('/api/me', {}, R)).status === 401, '탈퇴 뒤 로그인 표 무효');
+ok((await post('/api/auth/login', { username: uid, password: 'Recover2026x' })).status === 401, '탈퇴 뒤 로그인 불가');
+ok((await post('/api/auth/signup', { username: uid, password: PW, agree: true })).status === 409, '탈퇴한 아이디로 남이 다시 가입 불가');
+ok((await (await req(D3, {}, A.token)).json()).editors.includes('@' + uid), '(남의 문서 편집자 목록에 남은 @아이디는 다시 가입될 수 없어 안전)');
+
+// Google 회원 탈퇴
+const G = await login('g@test.kr');
+const cg = await (await req('/api/docs', { method: 'POST' }, G.token)).json();
+ok((await (await req('/api/me', {}, G.token)).json()).agreed === false, 'Google 첫 로그인: 약관 동의 전');
+await post('/api/account/agree', {}, G.token);
+ok((await (await req('/api/me', {}, G.token)).json()).agreed === true, 'Google: 약관 동의 기록');
+const gdel = await (await req('/api/account', { method: 'DELETE', body: JSON.stringify({ confirm: true }) }, G.token)).json();
+ok(gdel.ok && gdel.removed === 1 && (await req('/api/docs/' + cg.id)).status === 404, 'Google 회원 탈퇴 → 문서 지움');
+ok((await req('/api/me', {}, G.token)).status === 401, 'Google 탈퇴 뒤 예전 로그인 끊김');
+const G2 = await login('g@test.kr');
+const meG2 = await (await req('/api/me', {}, G2.token)).json();
+ok(meG2.email === 'g@test.kr' && meG2.agreed === false, 'Google 다시 로그인 → 새로 시작(약관 다시 동의)');
+ok((await (await req('/api/me', {}, A.token)).json()).email === 'a@test.kr', '다른 회원(A)의 로그인은 그대로');
+await req(D3, { method: 'DELETE' }, A.token);
 console.log(fail ? `\n실패 ${fail}개` : '\n모두 통과');
 process.exit(fail ? 1 : 0);

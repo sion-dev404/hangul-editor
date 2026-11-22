@@ -1,6 +1,7 @@
 // 한글 편집기 클라우드 서버
 // - 문서 내용·파일 이름·작성자 이름은 모두 편집기(내 PC)에서 암호화되어 온다. 서버는 열쇠가 없어 읽을 수 없다.
-// - 로그인: Google(OpenID Connect). 우리 서버는 비밀번호를 받지도 저장하지도 않는다.
+// - 로그인: Google(OpenID Connect) 또는 아이디+비밀번호 회원(accounts.js, 비밀번호는 해시만 보관).
+//   계정 표시(principal) = Google 이메일 또는 "@아이디". 문서 주인·편집자·내 문서함은 모두 이 표시로 구분한다.
 //   로그인 창 → Google → /auth/google/callback → 1회용 코드(2분, PKCE로 요청한 편집기에만 묶임) → /api/auth/exchange → 세션 표(서명, 30일)
 // - 권한: 문서 만들기·저장·잠금·되돌리기 = 로그인 + (주인 또는 주인이 지정한 이메일). 지우기·편집자 지정 = 주인만. 보기 = 링크(열쇠)만 있으면.
 // - 문서마다 Durable Object(DocRoom) 하나: 권한, 편집 잠금, 버전 목록, 실시간 알림(WebSocket), 버전 파일(1MB 조각)
@@ -12,7 +13,13 @@
 //   GET    /auth/google/start?challenge&ret   로그인 시작 (ret = 편집기 주소, 허용 목록만)
 //   GET    /auth/google/callback               Google이 돌려보냄
 //   POST   /api/auth/exchange {code, verifier} → { token, user:{email,name} }
-//   GET    /api/me                             → { email, name }
+//   POST   /api/auth/signup {username,password,nick,agree} → { token, user, recovery }
+//   POST   /api/auth/login  {username,password}  → { token, user }
+//   POST   /api/auth/recover {username,code,password} → { token, user, recovery }
+//   GET    /api/me                             → { email, name, kind, avatar, agreed }
+//   PUT    /api/account/profile {nick?,avatar?}   POST /api/account/agree
+//   PUT    /api/account/password {old,password} → { token }   POST /api/account/recovery {password} → { recovery }
+//   DELETE /api/account {password?,confirm}    회원 탈퇴 (내가 주인인 문서와 내 문서함을 지움)
 //   POST   /api/docs                    새 문서 (로그인) → { id }
 //   GET    /api/docs/:id                정보 → { versions, lock, created, you:{canEdit,isOwner}, editors? }
 //   GET    /api/docs/:id/v/:n           버전 n의 암호화된 파일
@@ -23,7 +30,9 @@
 //   DELETE /api/docs/:id                문서 지우기 (주인)
 //   GET    /api/docs/:id/live           WebSocket: {type:'version'|'lock'|'deleted', ...}
 
-import { homePage, privacyPage } from './pages.js';
+import { homePage, privacyPage, termsPage } from './pages.js';
+import { Account, ID_PRINCIPAL_RE, checkPassword, checkUsername, cleanNick, AVATAR_MAX } from './accounts.js';
+export { Account };
 
 const ID_RE = /^[A-Za-z0-9_-]{22}$/;
 const AUTHOR_MAX = 600;
@@ -86,7 +95,23 @@ const esc = (v) => String(v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&
 async function sessionOf(req, env) {
   const a = req.headers.get('Authorization') || '';
   if (!a.startsWith('Bearer ')) return null;
-  return verify(env, 'ses', a.slice(7));
+  const ses = await verify(env, 'ses', a.slice(7));
+  if (!ses) return null;
+  // 비밀번호 변경·탈퇴로 끊긴 로그인인지 계정에 묻는다
+  const { data } = await acctCall(env, ses.email, '/check', { tv: ses.tv || 0 });
+  return data.ok ? ses : null;
+}
+const acct = (env, principal) => env.ACCOUNT.get(env.ACCOUNT.idFromName(principal));
+async function acctCall(env, principal, path, body, method = 'POST') {
+  const res = await acct(env, principal).fetch(`https://acct${path}`, method === 'GET' ? {} : { method, body: JSON.stringify(body || {}) });
+  return { res, data: await res.clone().json().catch(() => ({})) };
+}
+const newSession = async (env, user, tv) => sign(env, 'ses', { ...user, tv, exp: Date.now() + SESSION_DAYS * 86400 * 1000 });
+const isPrincipal = (p) => EMAIL_RE.test(p) || ID_PRINCIPAL_RE.test(p);
+const clientIp = (req) => req.headers.get('CF-Connecting-IP') || 'local';
+async function ipLimit(env, req, what, max) {
+  const lim = env.LIMIT.get(env.LIMIT.idFromName(`ip:${what}:${clientIp(req)}`));
+  return (await (await lim.fetch('https://limit/take', { method: 'POST', body: String(max) })).json()).ok;
 }
 
 /* ---------- 로그인 ---------- */
@@ -150,9 +175,102 @@ async function authExchange(req, env) {
   const lc = await verify(env, 'lc', code);
   if (!lc || typeof verifier !== 'string' || verifier.length < 43 || verifier.length > 128) return json({ error: 'bad code' }, 400);
   if (!sameStr(await sha256b64u(verifier), lc.c)) return json({ error: 'bad verifier' }, 400);
-  const user = { sub: lc.sub, email: lc.email, name: lc.name };
-  const token = await sign(env, 'ses', { ...user, exp: Date.now() + SESSION_DAYS * 86400 * 1000 });
-  return json({ token, user: { email: user.email, name: user.name } });
+  const user = { sub: lc.sub, email: lc.email, name: lc.name, kind: 'google' };
+  const { data } = await acctCall(env, user.email, '/tv');
+  const token = await newSession(env, user, data.tv || 0);
+  return json({ token, user: { email: user.email, name: user.name, kind: 'google' } });
+}
+
+/* ---------- 아이디 회원 ---------- */
+const idUser = (username, nick) => ({ sub: `id:${username}`, email: `@${username}`, name: nick || username, kind: 'id' });
+const tooMany = () => json({ error: 'limit', message: '요청이 너무 많습니다. 잠시 뒤에 다시 해 주세요' }, 429);
+async function signup(req, env) {
+  const b = await req.json().catch(() => ({}));
+  const username = String(b.username || '').trim().toLowerCase();
+  const bad = checkUsername(username) || checkPassword(b.password, username);
+  if (bad) return json({ error: 'bad', message: bad }, 400);
+  if (b.agree !== true) return json({ error: 'agree', message: '이용약관과 개인정보처리방침에 동의해 주세요' }, 400);
+  if (!(await ipLimit(env, req, 'signup', Number(env.SIGNUPS_PER_DAY) || 10))) return tooMany();
+  const nick = cleanNick(b.nick) || username;
+  const { res, data } = await acctCall(env, `@${username}`, '/create', { username, password: b.password, nick });
+  if (!res.ok) return json(data, res.status);
+  const user = idUser(username, nick);
+  return json({ token: await newSession(env, user, data.tv), user: { email: user.email, name: user.name, kind: 'id' }, recovery: data.recovery }, 201);
+}
+async function passwordLogin(req, env, recover) {
+  const b = await req.json().catch(() => ({}));
+  const username = String(b.username || '').trim().toLowerCase().replace(/^@/, '');
+  const badMsg = recover ? '아이디 또는 복구 코드가 맞지 않습니다' : '아이디 또는 비밀번호가 맞지 않습니다';
+  if (!(await ipLimit(env, req, 'login', 200))) return tooMany();
+  if (checkUsername(username)) return json({ error: 'bad', message: badMsg }, 401);
+  if (recover) { const bad = checkPassword(b.password, username); if (bad) return json({ error: 'weak', message: bad }, 400); }
+  const { res, data } = await acctCall(env, `@${username}`, recover ? '/recover' : '/login', recover ? { code: b.code, password: b.password } : { password: b.password });
+  if (!res.ok) return json(data, res.status);
+  const user = idUser(username, data.nick);
+  return json({ token: await newSession(env, user, data.tv), user: { email: user.email, name: user.name, kind: 'id' }, ...(recover ? { recovery: data.recovery } : {}) });
+}
+async function ownedInVault(env, p) {
+  const ids = [];
+  try {
+    const vault = env.VAULT.get(env.VAULT.idFromName(p));
+    const vk = await vaultKey(env, p);
+    const st = await (await vault.fetch('https://vault/list')).json();
+    for (const e of st.docs) {
+      try {
+        const raw = unb64u(e.enc);
+        const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: raw.subarray(0, 12), additionalData: enc.encode(e.id) }, vk, raw.subarray(12));
+        if (JSON.parse(new TextDecoder().decode(plain)).role === 'owner') ids.push(e.id);
+      } catch { /* 망가진 칸 */ }
+    }
+  } catch { /* 보관함 없음 */ }
+  return ids;
+}
+async function account(req, url, env, ses) {
+  const p = ses.email;
+  if (url.pathname === '/api/account/profile' && req.method === 'PUT') {
+    const b = await req.json().catch(() => ({}));
+    const out = {};
+    if ('nick' in b) { out.nick = cleanNick(b.nick); if (!out.nick) return json({ error: 'bad', message: '이름을 넣어 주세요' }, 400); }
+    if ('avatar' in b) { if (b.avatar && String(b.avatar).length > AVATAR_MAX) return json({ error: 'bad avatar', message: '사진이 너무 큽니다' }, 400); out.avatar = b.avatar || null; }
+    const { res, data } = await acctCall(env, p, '/profile', out, 'PUT');
+    return json(data, res.status);
+  }
+  if (url.pathname === '/api/account/agree' && req.method === 'POST') return json((await acctCall(env, p, '/agree')).data);
+  if (url.pathname === '/api/account/password' && req.method === 'PUT') {
+    if (ses.kind !== 'id') return json({ error: 'bad', message: 'Google 계정의 비밀번호는 Google에서 바꿉니다' }, 400);
+    const b = await req.json().catch(() => ({}));
+    const bad = checkPassword(b.password, p.slice(1));
+    if (bad) return json({ error: 'weak', message: bad }, 400);
+    const { res, data } = await acctCall(env, p, '/passwd', { old: b.old, password: b.password });
+    if (!res.ok) return json(data, res.status);
+    return json({ token: await newSession(env, { sub: ses.sub, email: ses.email, name: ses.name, kind: 'id' }, data.tv) });
+  }
+  if (url.pathname === '/api/account/recovery' && req.method === 'POST') {
+    if (ses.kind !== 'id') return json({ error: 'bad' }, 400);
+    const b = await req.json().catch(() => ({}));
+    const { res, data } = await acctCall(env, p, '/newcode', { password: b.password });
+    return json(data, res.status);
+  }
+  if (url.pathname === '/api/account' && req.method === 'DELETE') {
+    const b = await req.json().catch(() => ({}));
+    if (b.confirm !== true) return json({ error: 'confirm', message: '탈퇴를 확인해 주세요' }, 400);
+    const ids = new Set(await ownedInVault(env, p)); // 계정을 지우기 전에 모은다
+    const { res, data } = await acctCall(env, p, '/delete', { password: b.password });
+    if (!res.ok) return json(data, res.status);
+    for (const id of data.owned || []) ids.add(id);
+    let removed = 0;
+    for (const id of ids) {
+      if (!ID_RE.test(id)) continue;
+      const r = await env.ROOM.get(env.ROOM.idFromName(id)).fetch('https://room/', { method: 'DELETE', headers: { 'X-User': p } });
+      if (r.ok) removed++;
+    }
+    // 내 문서함 비우기 (끄면 모두 지워지고, 다시 켜 둔다)
+    const vault = env.VAULT.get(env.VAULT.idFromName(p));
+    await vault.fetch('https://vault/settings', { method: 'PUT', body: JSON.stringify({ enabled: false }) });
+    await vault.fetch('https://vault/settings', { method: 'PUT', body: JSON.stringify({ enabled: true }) });
+    return json({ ok: true, removed });
+  }
+  return json({ error: 'not found' }, 404);
 }
 
 /* ---------- 내 문서함 (한컴독스처럼 어느 PC에서나) ----------
@@ -253,14 +371,27 @@ export default {
       if (url.pathname === '/auth/google/start' || url.pathname === '/auth/dev/start') return await authStart(url, env);
       if (url.pathname === '/auth/google/callback') return await authCallback(url, env);
       if (url.pathname === '/' || url.pathname === '/index.html') return new Response(homePage(), { headers: { ...SEC_HEADERS, 'Cache-Control': 'public, max-age=600' } });
+      if (url.pathname === '/terms') return new Response(termsPage(), { headers: { ...SEC_HEADERS, 'Cache-Control': 'public, max-age=600' } });
       if (url.pathname === '/privacy') return new Response(privacyPage(), { headers: { ...SEC_HEADERS, 'Cache-Control': 'public, max-age=600' } });
       if (!url.pathname.startsWith('/api/')) return new Response('찾는 페이지가 없습니다', { status: 404, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
       // 허용된 편집기 화면에서만 쓴다
       if (!('Access-Control-Allow-Origin' in h)) return json({ error: 'origin' }, 403, h);
 
       if (url.pathname === '/api/auth/exchange' && req.method === 'POST') return withCors(await authExchange(req, env), h);
+      if (url.pathname === '/api/auth/signup' && req.method === 'POST') return withCors(await signup(req, env), h);
+      if (url.pathname === '/api/auth/login' && req.method === 'POST') return withCors(await passwordLogin(req, env, false), h);
+      if (url.pathname === '/api/auth/recover' && req.method === 'POST') return withCors(await passwordLogin(req, env, true), h);
       const ses = await sessionOf(req, env);
-      if (url.pathname === '/api/me') return ses ? json({ email: ses.email, name: ses.name }, 200, h) : json({ error: 'login' }, 401, h);
+      if (url.pathname === '/api/me') {
+        if (!ses) return json({ error: 'login' }, 401, h);
+        const { data } = await acctCall(env, ses.email, '/profile', null, 'GET');
+        const kind = ses.kind || 'google';
+        return json({ email: ses.email, name: data.nick || ses.name, kind, avatar: data.avatar || '', agreed: kind === 'id' || !!data.terms }, 200, h);
+      }
+      if (url.pathname === '/api/account' || url.pathname.startsWith('/api/account/')) {
+        if (!ses) return json({ error: 'login', message: '로그인해 주세요' }, 401, h);
+        return withCors(await account(req, url, env, ses), h);
+      }
       if (url.pathname === '/api/mydocs' || url.pathname.startsWith('/api/mydocs/')) {
         if (!ses) return json({ error: 'login', message: '로그인해 주세요' }, 401, h);
         return withCors(await myDocs(req, url, env, ses), h);
@@ -277,6 +408,7 @@ export default {
         const id = rand(16);
         const room = env.ROOM.get(env.ROOM.idFromName(id));
         await room.fetch('https://room/init', { method: 'POST', body: JSON.stringify({ id, owner: ses.email }) });
+        await acctCall(env, ses.email, '/own', { id }); // 탈퇴할 때 함께 지우려고 기록
         return json({ id }, 201, h);
       }
 
@@ -291,8 +423,20 @@ export default {
       const headers = new Headers(req.headers);
       headers.delete('X-User');
       if (ses) headers.set('X-User', ses.email);
-      const fwd = new Request(`https://room/${parts.slice(3).join('/')}`, { method: req.method, headers, body: req.body });
-      return withCors(await room.fetch(fwd), h);
+      let fwdBody = req.body;
+      if (parts[3] === 'editors' && req.method === 'PUT') {
+        // 편집자로 넣는 "@아이디"는 실제로 있는 회원이어야 한다 (오타로 엉뚱한 사람에게 권한이 가지 않게)
+        const b = await req.json().catch(() => ({}));
+        const list = Array.isArray(b.editors) ? b.editors.map((e) => String(e).trim().toLowerCase()) : [];
+        for (const e of list) {
+          if (ID_PRINCIPAL_RE.test(e) && !(await acctCall(env, e, '/exists')).data.exists) return json({ error: 'no user', message: `${e} 아이디의 회원이 없습니다` }, 400, h);
+        }
+        fwdBody = JSON.stringify({ editors: list });
+      }
+      const fwd = new Request(`https://room/${parts.slice(3).join('/')}`, { method: req.method, headers, body: fwdBody });
+      const out = await room.fetch(fwd);
+      if (ses && req.method === 'DELETE' && parts.length === 3 && out.ok) await acctCall(env, ses.email, '/unown', { id });
+      return withCors(out, h);
     } catch (e) {
       return json({ error: 'server', message: String((e && e.message) || e) }, 500, h);
     }
@@ -419,7 +563,7 @@ export class DocRoom {
       if (!isOwner) return user ? json({ error: 'forbidden', message: '문서 주인만 바꿀 수 있습니다' }, 403) : json({ error: 'login' }, 401);
       const body = await req.json().catch(() => ({}));
       const list = [...new Set((Array.isArray(body.editors) ? body.editors : []).map((e) => String(e).trim().toLowerCase()))]
-        .filter((e) => EMAIL_RE.test(e) && e !== meta.owner).slice(0, 50);
+        .filter((e) => isPrincipal(e) && e !== meta.owner).slice(0, 50);
       meta.editors = list;
       await this.state.storage.put('meta', meta);
       return json({ editors: list });
