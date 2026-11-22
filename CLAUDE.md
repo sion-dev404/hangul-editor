@@ -22,6 +22,13 @@
 - 편집기는 `app.html`. 설치형(`electron/main.cjs`)도 `app.html`을 연다. 공유 링크는 `.../app.html#cloud=…`(`src/cloud.js` WEB_URL). 예전 링크 `.../hangul-editor/#cloud=…`는 `index.html` 맨 앞 스크립트가 `app.html`로 넘긴다.
 - `vite.config.js`의 `rollupOptions.input`에 두 쪽을 모두 적어야 빌드에 들어간다.
 
+## 홍보·블로그 (2026-11-22 사용자 결정)
+- 웹판 주소는 **https://sion-dev404.github.io/hangul-editor/ 로 고정**(도메인 구매·js.org 안 함). 무과금 원칙: 스토어·결제 정보가 필요한 홍보는 하지 않는다. 맥판·Microsoft Store도 하지 않는다.
+- 블로그: 네이버 블로그 `blog.naver.com/sion1221-`(글쓰기 `?Redirect=Write&`). **Claude in Chrome 확장은 네이버를 "안전상 허용되지 않는 사이트"로 막는다**(티스토리는 열림). 그래서 글과 실행 사진을 바탕 화면 폴더(`바탕 화면/블로그 N편/`: `N편 글.txt` + 사진 + PDF)로 만들고, 올리기는 사용자 또는 Claude 데스크톱 앱의 컴퓨터 사용 기능(Opus 5.5, 단계별 부탁)으로 한다.
+- 블로그 글 방침: 이모지 넣기, 실제 실행 사진 넣기, **개발 이야기·"제가 만들었다"는 넣지 않는다**(사용 안내 글). 다만 "우연히 발견했다"처럼 남인 척하는 거짓 문장은 쓰지 않는다.
+- 글 계획: 1편 맥·크롬북에서 hwp 여는 법(완료: 바탕 화면/블로그 1편), 2편 hwp ↔ 워드 변환, 3편 이후 미정. 검색 등록(네이버 서치어드바이저·구글 서치 콘솔)은 사용자가 하고, 확인 코드를 주면 `index.html`에 넣는다.
+- 실행 사진 찍기: 크롬 확장으로 실제 사이트를 찍거나(`save_to_disk`), Electron 스크립트로 개발 서버를 찍는다(VS Code에서는 `ELECTRON_RUN_AS_NODE`를 지우고 `node_modules/electron/dist/electron.exe`를 직접 실행).
+
 ## 화면 구성 (한글 2024식 밝은 화면)
 - 제목 줄: 로고 · 빠른 실행(새 문서·열기·저장·인쇄·되돌리기·다시 실행, 화면 종류별로 `#quickDocx`/`#quickHwp`) · 문서 이름(가운데) · 종류 · 저장 상태.
 - 탭 + 리본, 그 아래 서식 줄. 한글 화면의 서식 줄은 rhwp 안에 있고, 워드 화면의 서식 줄은 `#fmtBar`(스타일·글꼴·크기·굵게·정렬·줄 간격·목록)다.
