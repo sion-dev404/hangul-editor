@@ -264,6 +264,14 @@ async function account(req, url, env, ses) {
       const r = await env.ROOM.get(env.ROOM.idFromName(id)).fetch('https://room/', { method: 'DELETE', headers: { 'X-User': p } });
       if (r.ok) removed++;
     }
+    // 남의 문서 편집자 목록에서 이 아이디를 빼고 나서야 아이디를 풀어 준다 (새로 가입한 사람이 옛 권한을 얻지 못하게)
+    let dropped = true;
+    for (const id of data.shared || []) {
+      if (!ID_RE.test(id)) continue;
+      const r = await env.ROOM.get(env.ROOM.idFromName(id)).fetch('https://room/__drop', { method: 'POST', body: JSON.stringify({ user: p }) });
+      if (!r.ok && r.status !== 404) dropped = false;
+    }
+    if (dropped) await acctCall(env, p, '/free');
     // 내 문서함 비우기 (끄면 모두 지워지고, 다시 켜 둔다)
     const vault = env.VAULT.get(env.VAULT.idFromName(p));
     await vault.fetch('https://vault/settings', { method: 'PUT', body: JSON.stringify({ enabled: false }) });
@@ -423,8 +431,12 @@ export default {
       const headers = new Headers(req.headers);
       headers.delete('X-User');
       if (ses) headers.set('X-User', ses.email);
+      // 내부 전용 경로(__drop 등)는 바깥에서 부를 수 없다
+      if ((parts[3] || '').startsWith('__')) return json({ error: 'not found' }, 404, h);
       let fwdBody = req.body;
+      let before = null; // 편집자 목록을 바꾸기 전 목록 (아이디 회원 기록을 맞추려고)
       if (parts[3] === 'editors' && req.method === 'PUT') {
+        if (ses) before = (await (await room.fetch('https://room/', { headers: { 'X-User': ses.email } })).json().catch(() => ({}))).editors || null;
         // 편집자로 넣는 "@아이디"는 실제로 있는 회원이어야 한다 (오타로 엉뚱한 사람에게 권한이 가지 않게)
         const b = await req.json().catch(() => ({}));
         const list = Array.isArray(b.editors) ? b.editors.map((e) => String(e).trim().toLowerCase()) : [];
@@ -436,6 +448,12 @@ export default {
       const fwd = new Request(`https://room/${parts.slice(3).join('/')}`, { method: req.method, headers, body: fwdBody });
       const out = await room.fetch(fwd);
       if (ses && req.method === 'DELETE' && parts.length === 3 && out.ok) await acctCall(env, ses.email, '/unown', { id });
+      if (before && out.ok) {
+        // 아이디 회원 계정에 "이 문서의 편집자"인지 적어 둔다 → 탈퇴할 때 이 문서에서 빠진다
+        const after = (await out.clone().json().catch(() => ({}))).editors || [];
+        for (const e of after) if (ID_PRINCIPAL_RE.test(e) && !before.includes(e)) await acctCall(env, e, '/shared', { id });
+        for (const e of before) if (ID_PRINCIPAL_RE.test(e) && !after.includes(e)) await acctCall(env, e, '/unshared', { id });
+      }
       return withCors(out, h);
     } catch (e) {
       return json({ error: 'server', message: String((e && e.message) || e) }, 500, h);
@@ -556,6 +574,16 @@ export class DocRoom {
         await this.state.storage.delete('lock');
         this.broadcast({ type: 'lock', lock: null });
       }
+      return json({ ok: true });
+    }
+
+    if (path === '__drop' && req.method === 'POST') {
+      // 탈퇴한 회원을 편집자 목록에서 빼고, 그 회원의 편집 잠금도 푼다 (서버 안에서만 부름)
+      const { user: gone } = await req.json().catch(() => ({}));
+      meta.editors = meta.editors.filter((e) => e !== gone);
+      await this.state.storage.put('meta', meta);
+      const l = await this.activeLock();
+      if (l && l.user === gone) { await this.state.storage.delete('lock'); this.broadcast({ type: 'lock', lock: null }); }
       return json({ ok: true });
     }
 

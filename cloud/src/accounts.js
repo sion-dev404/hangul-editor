@@ -97,19 +97,30 @@ export class Account {
     const now = Date.now();
     const st = this.state.storage;
     const a = (await st.get('acct')) || null;
-    const live = a && !a.deleted;
+    // 탈퇴한 아이디(free)는 비어 있는 자리다: 다시 가입할 수 있지만 tv는 이어서 올라가 예전 로그인 표는 되살아나지 않는다
+    const gone = !!(a && (a.deleted || a.free || a.deleting));
+    const live = a && !gone;
     const tv = (a && a.tv) || 0;
 
-    if (path === '/check') return json({ ok: !(a && a.deleted) && tv === (body.tv || 0) });
+    if (path === '/check') return json({ ok: !gone && tv === (body.tv || 0) });
     if (path === '/exists') return json({ exists: !!(live && a.kind === 'id') });
     if (path === '/tv') return json({ tv }); // Google 로그인 때 현재 표 버전
 
     if (path === '/create') {
-      if (a) return json({ error: 'taken', message: '이미 있거나 쓸 수 없는 아이디입니다' }, 409);
+      if (a && (!gone || a.deleting)) return json({ error: 'taken', message: '이미 있는 아이디입니다' }, 409);
+      const ntv = gone ? tv + 1 : 0;
       const { code, rec } = await this.newRecovery();
-      await st.put('acct', { kind: 'id', username: body.username, ...(await this.newSecret(body.password)), rec, created: now, terms: now, tv: 0, fails: 0 });
+      await st.deleteAll();
+      await st.put('acct', { kind: 'id', username: body.username, ...(await this.newSecret(body.password)), rec, created: now, terms: now, tv: ntv, fails: 0 });
       await st.put('profile', { nick: cleanNick(body.nick) || body.username });
-      return json({ tv: 0, recovery: code }, 201);
+      return json({ tv: ntv, recovery: code }, 201);
+    }
+    // 이 아이디가 편집자로 들어간 문서 기록 (탈퇴할 때 그 문서들의 편집자 목록에서 뺀다)
+    if (path === '/shared' || path === '/unshared') {
+      if (!live) return json({ ok: false });
+      const key = `shared:${body.id}`;
+      if (path === '/shared') await st.put(key, now); else await st.delete(key);
+      return json({ ok: true });
     }
 
     if (path === '/login' || path === '/recover') {
@@ -195,11 +206,19 @@ export class Account {
         }
       }
       const owned = [...(await st.list({ prefix: 'own:' })).keys()].map((k) => k.slice(4));
+      const shared = [...(await st.list({ prefix: 'shared:' })).keys()].map((k) => k.slice(7));
       const kind = a ? a.kind : 'google';
       await st.deleteAll();
-      // 아이디 회원: 아이디를 영구히 막아 둔다. Google 회원: 표 버전만 올려 남은 로그인을 끊는다(다시 로그인하면 새로 시작).
-      await st.put('acct', kind === 'id' ? { kind, deleted: true, deletedAt: now, tv: tv + 1 } : { kind, tv: tv + 1, removedAt: now });
-      return json({ owned });
+      // 모든 정보를 지우고 표 버전만 올려 남은 로그인을 끊는다. 아이디는 비워 두어 다시 가입할 수 있다
+      // (남의 문서 편집자 목록에서는 호출한 쪽이 이 아이디를 빼므로 새 가입자가 옛 권한을 얻지 못한다).
+      // 아이디는 바로 풀지 않고 "지우는 중"으로 둔다 → 남의 문서에서 이 아이디를 다 뺀 뒤 /free로 푼다
+      // (중간에 멈춰도 아이디가 풀리지 않을 뿐이라 안전하다)
+      await st.put('acct', kind === 'id' ? { kind, deleting: true, tv: tv + 1 } : { kind, tv: tv + 1 });
+      return json({ owned, shared });
+    }
+    if (path === '/free') {
+      if (a && a.deleting) await st.put('acct', { kind: a.kind, free: true, tv });
+      return json({ ok: true });
     }
 
     return json({ error: 'not found' }, 404);

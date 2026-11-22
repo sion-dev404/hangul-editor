@@ -200,6 +200,9 @@ const D4 = '/api/docs/' + c4.id;
 const l4 = await (await req(D4 + '/lock', { method: 'POST', body: JSON.stringify({ by: 'R' }) }, R)).json();
 await req(D4, { method: 'PUT', headers: { 'X-Lock-Id': l4.lockId }, body }, R);
 await req('/api/mydocs/' + c4.id, { method: 'PUT', body: JSON.stringify({ key: K, name: '내 글.hwp', format: 'hwp', role: 'owner' }) }, R);
+ok((await req(D3 + '/__drop', { method: 'POST', body: JSON.stringify({ user: 'b@test.kr' }) }, A.token)).status === 404, '내부 전용 경로(__drop)는 바깥에서 못 부름');
+const l3r = await (await req(D3 + '/lock', { method: 'POST', body: JSON.stringify({ by: 'R' }) }, R)).json();
+ok(!!l3r.lockId, '탈퇴할 회원이 A 문서를 편집 중(잠금)');
 ok((await req('/api/account', { method: 'DELETE', body: JSON.stringify({ confirm: true, password: 'Wrong1234' }) }, R)).status === 401, '비밀번호 틀리면 탈퇴 거절');
 ok((await req('/api/account', { method: 'DELETE', body: JSON.stringify({ password: 'Recover2026x' }) }, R)).status === 400, '확인 없이 탈퇴 거절');
 const del = await (await req('/api/account', { method: 'DELETE', body: JSON.stringify({ confirm: true, password: 'Recover2026x' }) }, R)).json();
@@ -207,8 +210,26 @@ ok(del.ok && del.removed === 1, `탈퇴 → 내가 주인인 문서 ${del.remove
 ok((await req(D4)).status === 404, '탈퇴한 회원의 문서는 없어짐');
 ok((await req('/api/me', {}, R)).status === 401, '탈퇴 뒤 로그인 표 무효');
 ok((await post('/api/auth/login', { username: uid, password: 'Recover2026x' })).status === 401, '탈퇴 뒤 로그인 불가');
-ok((await post('/api/auth/signup', { username: uid, password: PW, agree: true })).status === 409, '탈퇴한 아이디로 남이 다시 가입 불가');
-ok((await (await req(D3, {}, A.token)).json()).editors.includes('@' + uid), '(남의 문서 편집자 목록에 남은 @아이디는 다시 가입될 수 없어 안전)');
+const infoD3 = await (await req(D3, {}, A.token)).json();
+ok(!infoD3.editors.includes('@' + uid) && infoD3.editors.includes('b@test.kr'), `탈퇴 → 남의 문서 편집자 목록에서 빠짐 (${JSON.stringify(infoD3.editors)})`);
+ok(infoD3.lock === null, '탈퇴한 회원의 편집 잠금도 풀림');
+const re = await post('/api/auth/signup', { username: uid, password: 'Newbie2026zz', nick: '새사람', agree: true });
+const NEW = await re.json();
+ok(re.status === 201 && !!NEW.token, '탈퇴한 아이디로 새로 가입 가능');
+ok((await (await req(D3, {}, NEW.token)).json()).you.canEdit === false, '새로 가입한 사람은 옛 회원의 편집 권한을 못 얻음');
+ok((await req('/api/me', {}, R)).status === 401 && (await req('/api/me', {}, lg.token)).status === 401, '옛 회원의 로그인 표는 새 계정으로 되살아나지 않음');
+ok((await (await req('/api/me', {}, NEW.token)).json()).name === '새사람', '새 계정은 옛 프로필 없이 새로 시작');
+ok((await post('/api/auth/recover', { username: uid, code: rc.recovery, password: 'Steal2026zz' })).status === 401, '옛 회원의 복구 코드로 새 계정 못 가로챔');
+ok((await (await req('/api/mydocs', {}, NEW.token)).json()).docs.length === 0, '새 계정의 내 문서함은 비어 있음');
+// 편집자에서 뺐다가 다시 넣기 → 기록이 맞게 따라감
+const c5 = await (await req('/api/docs', { method: 'POST' }, A.token)).json();
+const D5 = '/api/docs/' + c5.id;
+await req(D5 + '/editors', { method: 'PUT', body: JSON.stringify({ editors: ['@' + uid] }) }, A.token);
+await req(D5 + '/editors', { method: 'PUT', body: JSON.stringify({ editors: [] }) }, A.token);
+await req(D5 + '/editors', { method: 'PUT', body: JSON.stringify({ editors: ['@' + uid, 'c@test.kr'] }) }, A.token);
+await req('/api/account', { method: 'DELETE', body: JSON.stringify({ confirm: true, password: 'Newbie2026zz' }) }, NEW.token);
+ok(JSON.stringify((await (await req(D5, {}, A.token)).json()).editors) === '["c@test.kr"]', '다시 넣은 문서에서도 탈퇴 때 빠짐');
+await req(D5, { method: 'DELETE' }, A.token);
 
 // Google 회원 탈퇴
 const G = await login('g@test.kr');
