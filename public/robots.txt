@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://sion-dev404.github.io/hangul-editor/sitemap.xml

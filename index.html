@@ -3,342 +3,289 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>한글 편집기</title>
+  <script>
+    // 예전 공유 링크(…/hangul-editor/#cloud=…)는 편집기로 바로 넘긴다
+    if (/^#cloud=/.test(location.hash)) location.replace('app.html' + location.hash);
+  </script>
+  <title>한글 편집기 — 설치 없이 hwp 파일 열기·편집·워드 변환 (무료)</title>
+  <meta name="description" content="한컴오피스 없이 브라우저에서 한글(hwp·hwpx) 문서와 워드(docx) 문서를 무료로 열고 고치세요. 한글↔워드 변환, 클라우드 공유, 공공누리 글꼴 175종. 맥·크롬북·윈도우 어디서나." />
+  <meta name="keywords" content="hwp 열기, hwp 뷰어, 한글 파일 열기, 한글 없이 hwp, 맥 hwp, hwp 워드 변환, hwpx, 무료 한글 편집기" />
+  <link rel="canonical" href="https://sion-dev404.github.io/hangul-editor/" />
   <link rel="icon" type="image/svg+xml" href="./logo.svg" />
-  <link rel="apple-touch-icon" href="./logo.svg" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Nanum+Gothic:wght@400;700&family=Nanum+Myeongjo:wght@400;700&family=Noto+Sans+KR:wght@400;700&family=Noto+Serif+KR:wght@400;700&display=swap" rel="stylesheet" />
+  <link rel="apple-touch-icon" href="./landing/icon-180.png" />
+  <meta name="theme-color" content="#f76a4a" />
+
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="한글 편집기" />
+  <meta property="og:title" content="한글 편집기 — 설치 없이 hwp 파일 열기 (무료)" />
+  <meta property="og:description" content="한컴오피스 없이 브라우저에서 한글·워드 문서를 열고, 고치고, 서로 바꾸세요." />
+  <meta property="og:url" content="https://sion-dev404.github.io/hangul-editor/" />
+  <meta property="og:image" content="https://sion-dev404.github.io/hangul-editor/landing/og.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:locale" content="ko_KR" />
+  <meta name="twitter:card" content="summary_large_image" />
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "SoftwareApplication",
+        "name": "한글 편집기",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Web, Windows",
+        "url": "https://sion-dev404.github.io/hangul-editor/",
+        "description": "한컴오피스 없이 한글(hwp·hwpx)과 워드(docx) 문서를 열고, 고치고, 서로 바꾸는 무료 편집기",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "KRW" }
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          { "@type": "Question", "name": "정말 무료인가요?", "acceptedAnswer": { "@type": "Answer", "text": "네. 모든 기능을 무료로 씁니다. 결제나 카드 등록이 없습니다." } },
+          { "@type": "Question", "name": "한글 프로그램이 없어도 hwp 파일을 열 수 있나요?", "acceptedAnswer": { "@type": "Answer", "text": "네. 한컴오피스 없이 브라우저에서 hwp·hwpx 파일을 열고 고치고 저장합니다." } },
+          { "@type": "Question", "name": "맥이나 크롬북에서도 되나요?", "acceptedAnswer": { "@type": "Answer", "text": "네. 크롬·엣지 같은 최신 브라우저가 있으면 웹판을 바로 씁니다. 설치형은 윈도우용입니다." } },
+          { "@type": "Question", "name": "내 문서가 서버로 올라가나요?", "acceptedAnswer": { "@type": "Answer", "text": "아니요. 열고 고치는 일은 모두 내 컴퓨터 안에서 합니다. 클라우드에 저장할 때만 내 컴퓨터에서 암호화한 뒤 올라갑니다." } }
+        ]
+      }
+    ]
+  }
+  </script>
+
+  <style>
+    :root {
+      --ink: #1d2433; --sub: #5b6475; --line: #e6e8ee; --bg: #ffffff; --soft: #f6f7fa;
+      --brand: #f76a4a; --brand-d: #e2532f; --brand-soft: #fff1ec; --teal: #139c90; --teal-soft: #e6f6f4;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.65 "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif; word-break: keep-all; }
+    a { color: inherit; }
+    .wrap { max-width: 1120px; margin: 0 auto; padding: 0 20px; }
+
+    /* 위쪽 줄 */
+    .nav { position: sticky; top: 0; z-index: 10; background: rgba(255,255,255,.92); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
+    .nav .wrap { display: flex; align-items: center; gap: 24px; height: 64px; }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; text-decoration: none; }
+    .brand img { width: 32px; height: 32px; }
+    .nav .links { display: flex; gap: 20px; margin-left: auto; font-size: 15px; color: var(--sub); }
+    .nav .links a { text-decoration: none; }
+    .nav .links a:hover { color: var(--ink); }
+
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 24px; border-radius: 12px; font-weight: 700; font-size: 16px; text-decoration: none; border: 1px solid transparent; cursor: pointer; transition: background .15s, transform .15s; }
+    .btn:active { transform: translateY(1px); }
+    .btn.main { background: var(--brand); color: #fff; box-shadow: 0 6px 18px rgba(247,106,74,.28); }
+    .btn.main:hover { background: var(--brand-d); }
+    .btn.sub { background: #fff; color: var(--ink); border-color: var(--line); }
+    .btn.sub:hover { background: var(--soft); }
+    .btn.small { min-height: 40px; padding: 0 16px; font-size: 15px; border-radius: 10px; box-shadow: none; }
+
+    /* 첫 화면 */
+    .hero { padding: 72px 0 40px; text-align: center; background: linear-gradient(180deg, var(--brand-soft) 0%, #fff 70%); }
+    .badge { display: inline-block; padding: 6px 14px; border-radius: 999px; background: #fff; border: 1px solid #fbd3c6; color: var(--brand-d); font-size: 14px; font-weight: 700; }
+    .hero h1 { margin: 20px auto 16px; font-size: clamp(30px, 5.2vw, 52px); line-height: 1.25; letter-spacing: -0.02em; max-width: 820px; }
+    .hero h1 em { font-style: normal; color: var(--brand); }
+    .hero p.lead { margin: 0 auto; max-width: 640px; font-size: clamp(16px, 2.2vw, 19px); color: var(--sub); }
+    .cta { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin: 32px 0 14px; }
+    .note { font-size: 14px; color: var(--sub); }
+    .shot { margin: 48px auto 0; max-width: 1040px; border-radius: 16px; overflow: hidden; border: 1px solid var(--line); box-shadow: 0 24px 60px rgba(29,36,51,.14); background: #fff; }
+    .shot img { display: block; width: 100%; height: auto; }
+
+    section { padding: 72px 0; }
+    section.alt { background: var(--soft); }
+    h2 { margin: 0 0 12px; font-size: clamp(24px, 3.6vw, 34px); letter-spacing: -0.01em; text-align: center; }
+    .sec-lead { margin: 0 auto 40px; max-width: 620px; text-align: center; color: var(--sub); }
+
+    /* 강점 */
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+    .card { background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 24px; }
+    .card .ico { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; background: var(--brand-soft); color: var(--brand-d); margin-bottom: 14px; }
+    .card .ico.t { background: var(--teal-soft); color: var(--teal); }
+    .card .ico svg { width: 24px; height: 24px; }
+    .card h3 { margin: 0 0 6px; font-size: 18px; }
+    .card p { margin: 0; color: var(--sub); font-size: 15px; }
+    .card b.num { color: var(--brand-d); }
+
+    /* 이런 분께 */
+    .who { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+    .who div { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 20px; }
+    .who strong { display: block; margin-bottom: 4px; }
+    .who span { color: var(--sub); font-size: 15px; }
+
+    /* 사용법 */
+    .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; counter-reset: s; }
+    .step { position: relative; padding: 24px 24px 24px 76px; background: #fff; border: 1px solid var(--line); border-radius: 16px; }
+    .step::before { counter-increment: s; content: counter(s); position: absolute; left: 24px; top: 22px; width: 36px; height: 36px; border-radius: 50%; background: var(--brand); color: #fff; font-weight: 700; display: grid; place-items: center; }
+    .step h3 { margin: 4px 0 4px; font-size: 17px; }
+    .step p { margin: 0; color: var(--sub); font-size: 15px; }
+
+    /* 자주 묻는 질문 */
+    .faq { max-width: 780px; margin: 0 auto; }
+    .faq details { background: #fff; border: 1px solid var(--line); border-radius: 14px; margin-bottom: 10px; }
+    .faq summary { cursor: pointer; list-style: none; padding: 18px 52px 18px 20px; font-weight: 700; position: relative; }
+    .faq summary::-webkit-details-marker { display: none; }
+    .faq summary::after { content: "+"; position: absolute; right: 20px; top: 50%; transform: translateY(-50%); font-size: 22px; color: var(--sub); }
+    .faq details[open] summary::after { content: "−"; }
+    .faq details p { margin: 0; padding: 0 20px 18px; color: var(--sub); }
+
+    .final { text-align: center; padding: 80px 0; background: linear-gradient(135deg, #ff8452, #f76a4a); color: #fff; }
+    .final h2 { color: #fff; }
+    .final p { margin: 0 0 28px; opacity: .92; }
+    .final .btn.main { background: #fff; color: var(--brand-d); box-shadow: 0 8px 24px rgba(0,0,0,.15); }
+    .final .btn.main:hover { background: #fff6f2; }
+    .final .btn.sub { background: transparent; color: #fff; border-color: rgba(255,255,255,.6); }
+    .final .btn.sub:hover { background: rgba(255,255,255,.12); }
+
+    footer { padding: 36px 0 48px; font-size: 13px; color: var(--sub); border-top: 1px solid var(--line); }
+    footer .row { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-bottom: 12px; }
+    footer p { margin: 4px 0; }
+
+    @media (max-width: 900px) {
+      .grid, .steps { grid-template-columns: 1fr 1fr; }
+      .who { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 620px) {
+      .nav .links { display: none; }
+      .nav .btn.small { margin-left: auto; }
+      .hero { padding-top: 48px; }
+      .cta .btn { width: 100%; }
+      .grid, .steps, .who { grid-template-columns: 1fr; }
+      section { padding: 56px 0; }
+    }
+  </style>
 </head>
 <body>
-  <header class="titlebar">
-    <img class="logo" src="./logo.svg" alt="한글 편집기" width="26" height="26" />
-    <!-- 빠른 실행 줄: 어느 화면에서나 같은 자리에서 새 문서·열기·저장·인쇄·되돌리기·다시 실행 -->
-    <div class="quick" id="quick">
-      <span id="quickDocx">
-        <button data-act="new" title="새 워드 문서" data-ico="docw"></button>
-        <button data-act="open" title="불러오기" data-ico="open"></button>
-        <button data-act="save" title="워드(.docx)로 저장" data-ico="save"></button>
-        <button data-act="print" title="인쇄 · PDF" data-ico="print"></button>
-        <button data-act="undo" title="되돌리기" data-ico="undo"></button>
-        <button data-act="redo" title="다시 실행" data-ico="redo"></button>
-      </span>
-      <span id="quickHwp">
-        <button data-hact="newHwp" title="새 한글 문서" data-ico="doc"></button>
-        <button data-hact="open" title="불러오기" data-ico="open"></button>
-        <button data-hact="saveCurrent" title="저장" data-ico="save"></button>
-        <button data-hcmd="file:print" title="인쇄" data-ico="print"></button>
-        <button data-hcmd="edit:undo" title="되돌리기" data-ico="undo"></button>
-        <button data-hcmd="edit:redo" title="다시 실행" data-ico="redo"></button>
-      </span>
+  <header class="nav">
+    <div class="wrap">
+      <a class="brand" href="./"><img src="./logo.svg" alt="" width="32" height="32" />한글 편집기</a>
+      <nav class="links">
+        <a href="#features">기능</a>
+        <a href="#how">사용법</a>
+        <a href="#faq">자주 묻는 질문</a>
+      </nav>
+      <a class="btn main small" href="./app.html">지금 시작하기</a>
     </div>
-    <input id="docName" value="새 문서" aria-label="문서 이름" />
-    <span id="modeBadge"></span>
-    <span id="saveState">자동 저장됨</span>
   </header>
 
-  <div id="hwpUi">
-    <nav class="tabs" id="hwpTabs"></nav>
-    <section class="ribbon" id="hwpRibbon"></section>
-  </div>
-
-  <div id="docxUi">
-  <nav class="tabs" id="tabs">
-    <button data-tab="file">파일</button>
-    <button data-tab="home" class="on">편집</button>
-    <button data-tab="insert">입력</button>
-    <button data-tab="table">표</button>
-    <button data-tab="page">쪽</button>
-    <button data-tab="view">보기</button>
-  </nav>
-
-  <section class="ribbon" id="ribbon">
-    <!-- 파일 -->
-    <div class="panel" data-panel="file" hidden>
-      <div class="group">
-        <div class="row">
-          <button class="big" data-act="newHwp"><i data-ico="doc"></i>새 한글 문서</button>
-          <button class="big" data-act="new"><i data-ico="docw"></i>새 워드 문서</button>
-          <button class="big" data-act="open"><i data-ico="open"></i>불러오기<small>.hwp .hwpx .docx</small></button>
+  <main>
+    <div class="hero">
+      <div class="wrap">
+        <span class="badge">무료 · 설치 없이 · 회원가입 없이</span>
+        <h1>한글(hwp) 문서,<br /><em>설치 없이 바로</em> 열고 고치세요</h1>
+        <p class="lead">한컴오피스가 없어도 괜찮아요. 브라우저에서 hwp·hwpx·docx 문서를 열고, 고치고, 한글과 워드로 서로 바꿉니다.</p>
+        <div class="cta">
+          <a class="btn main" href="./app.html">지금 시작하기 →</a>
+          <a class="btn sub" href="https://github.com/sion-dev404/hangul-editor/releases/latest">Windows 설치 파일 받기</a>
         </div>
-        <div class="glabel">문서</div>
-      </div>
-      <div class="group">
-        <div class="row">
-          <button class="big" data-act="save"><i data-ico="save"></i>워드로 저장<small>.docx</small></button>
-          <button class="big" data-act="saveHwp" id="saveHwpBtn"><i data-ico="save"></i>한글로 저장<small>.hwp</small></button>
-          <button class="big" data-act="print"><i data-ico="print"></i>인쇄 · PDF</button>
-        </div>
-        <div class="glabel">저장 · 인쇄</div>
-      </div>
-      <div class="group">
-        <div class="row">
-          <button class="big" data-act="cloudMyDocs"><i data-ico="mydocs"></i>내 문서</button>
-          <button class="big" data-act="cloudSave"><i data-ico="cloudup"></i>클라우드에 저장</button>
-          <button class="big" data-act="cloudShare"><i data-ico="share"></i>공유 링크</button>
-          <button class="big" data-act="cloudVersions"><i data-ico="history"></i>버전 기록</button>
-          <button class="big" data-act="cloudOpen"><i data-ico="cloudopen"></i>링크로 열기</button>
-          <button class="big" data-act="cloudAccount"><i data-ico="user"></i>계정</button>
-        </div>
-        <div class="glabel">클라우드</div>
-      </div>
-      <div class="group">
-        <div class="row">
-          <button class="big" data-act="fontCredits"><i data-ico="style"></i>글꼴 출처</button>
-        </div>
-        <div class="glabel">정보</div>
+        <div class="note">맥 · 윈도우 · 크롬북의 크롬, 엣지 같은 최신 브라우저에서 바로 됩니다</div>
+        <div class="shot"><img src="./landing/editor.png" alt="한글 편집기 화면: 동아리 발표회 안내 문서를 편집하는 모습" width="1280" height="800" /></div>
       </div>
     </div>
 
-    <!-- 편집 -->
-    <div class="panel" data-panel="home">
-      <div class="group">
-        <div class="row">
-          <button class="big" data-act="paste"><i data-ico="paste"></i>붙이기</button>
-          <div class="rows">
-            <div class="row"><button data-act="cut">오려 두기</button><button data-act="copy">복사</button></div>
-            <div class="row"><button data-cmd="selectAll">모두 선택</button><button data-cmd="removeFormat" title="글자 모양 지우기">모양 지우기</button></div>
+    <section id="features">
+      <div class="wrap">
+        <h2>한글 편집기만의 기능</h2>
+        <p class="sec-lead">보기만 하는 뷰어가 아닙니다. 고치고, 바꾸고, 함께 씁니다.</p>
+        <div class="grid">
+          <div class="card">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 14l2 2 4-4"/></svg></div>
+            <h3>설치 없이 hwp 열기·편집</h3>
+            <p>hwp·hwpx 파일을 브라우저에서 바로 열어 글자·표·쪽 모양을 고치고 저장합니다.</p>
+          </div>
+          <div class="card">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h13l-3-3"/><path d="M20 16H7l3 3"/></svg></div>
+            <h3>한글 ↔ 워드 변환</h3>
+            <p>한글 프로그램 없이 hwp를 워드(docx)로, 워드를 hwp로 바꿉니다. 표·그림·줄 간격까지 챙깁니다.</p>
+          </div>
+          <div class="card">
+            <div class="ico t"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18a4.5 4.5 0 0 1-.5-9A6 6 0 0 1 18 8a4 4 0 0 1-1 10z"/><path d="M12 11v6"/><path d="M9.5 13.5 12 11l2.5 2.5"/></svg></div>
+            <h3>클라우드 공유 · 버전 기록</h3>
+            <p>링크 하나로 문서를 나누고, 정한 사람만 고치게 합니다. 최근 20개 버전으로 언제든 되돌립니다.</p>
+          </div>
+          <div class="card">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg></div>
+            <h3>한글 2024와 <b class="num">97%</b> 일치</h3>
+            <p>실제 문서 68개를 한글 2024와 쪽마다 비교해 맞춰 왔습니다. 공문서 같은 복잡한 문서도 반듯하게.</p>
+          </div>
+          <div class="card">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20 10 4h4l6 16"/><path d="M7 14h10"/></svg></div>
+            <h3>무료 글꼴 175종</h3>
+            <p>공공누리 무료 글꼴을 담았습니다. 문서에 쓴 글꼴이 화면과 인쇄·PDF에 그대로 나옵니다.</p>
+          </div>
+          <div class="card">
+            <div class="ico t"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></div>
+            <h3>내 문서는 내 컴퓨터에서</h3>
+            <p>열고 고치는 일은 모두 내 컴퓨터 안에서 합니다. 클라우드에 저장할 때만 암호화해서 올립니다.</p>
           </div>
         </div>
-        <div class="glabel">클립보드</div>
       </div>
-      <div class="group">
-        <div class="row">
-          <button class="big" data-act="find"><i data-ico="find"></i>찾기</button>
-          <button class="big" data-act="find"><i data-ico="replace"></i>찾아 바꾸기</button>
-        </div>
-        <div class="glabel">찾기</div>
-      </div>
-      <div class="group">
-        <div class="row">
-          <button class="big" data-act="hf"><i data-ico="header"></i>머리말 · 꼬리말</button>
-          <button class="big" data-act="hfNum"><i data-ico="pagenum"></i>쪽 번호</button>
-        </div>
-        <div class="glabel">쪽 꾸미기</div>
-      </div>
-    </div>
+    </section>
 
-    <!-- 입력 -->
-    <div class="panel" data-panel="insert" hidden>
-      <div class="group">
-        <div class="row">
-          <button class="big" data-pop="popTable"><i data-ico="table"></i>표</button>
-          <button class="big" data-act="image"><i data-ico="image"></i>그림</button>
-          <button class="big" data-pop="popChars"><i data-ico="symbol"></i>문자표</button>
-          <button class="big" data-act="date"><i data-ico="date"></i>날짜</button>
-          <button class="big" data-act="hr"><i data-ico="hline"></i>가로선</button>
-          <button class="big" data-act="pagebreak"><i data-ico="pagebreak"></i>쪽 나누기</button>
+    <section class="alt">
+      <div class="wrap">
+        <h2>이런 분께 딱 맞아요</h2>
+        <p class="sec-lead">"hwp 파일이 안 열려요"로 고민하던 분들을 위해 만들었습니다.</p>
+        <div class="who">
+          <div><strong>맥 · 크롬북 사용자</strong><span>한글 프로그램을 깔 수 없거나 사기 부담스러울 때</span></div>
+          <div><strong>학부모</strong><span>학교에서 온 가정통신문·신청서를 열고 적어서 보낼 때</span></div>
+          <div><strong>대학생</strong><span>hwp로 받은 과제 양식을 채우거나 워드로 바꿀 때</span></div>
+          <div><strong>직장인</strong><span>공문서를 확인하고 고쳐서 다시 보낼 때</span></div>
         </div>
-        <div class="glabel">넣기</div>
       </div>
-      <div class="group">
-        <div class="row">
-          <button class="big" data-act="hf"><i data-ico="header"></i>머리말</button>
-          <button class="big" data-act="hf"><i data-ico="footer"></i>꼬리말</button>
-          <button class="big" data-act="hfNum"><i data-ico="pagenum"></i>쪽 번호</button>
-        </div>
-        <div class="glabel">머리말 · 꼬리말</div>
-      </div>
-    </div>
+    </section>
 
-    <!-- 표 -->
-    <div class="panel" data-panel="table" hidden>
-      <div class="group">
-        <div class="row">
-          <button class="big" data-pop="popTable"><i data-ico="table"></i>표 넣기</button>
+    <section id="how">
+      <div class="wrap">
+        <h2>사용법은 세 단계</h2>
+        <p class="sec-lead">설치도, 회원가입도 필요 없습니다.</p>
+        <div class="steps">
+          <div class="step"><h3>지금 시작하기</h3><p>아래 단추를 누르면 바로 편집기가 열립니다.</p></div>
+          <div class="step"><h3>파일 열기</h3><p>hwp·hwpx·docx 파일을 불러오거나 새 문서를 만듭니다.</p></div>
+          <div class="step"><h3>고치고 저장</h3><p>한글이나 워드로 저장하고, 인쇄에서 PDF로도 남깁니다.</p></div>
         </div>
-        <div class="glabel">만들기</div>
+        <div class="cta"><a class="btn main" href="./app.html">지금 시작하기 →</a></div>
       </div>
-      <div class="group">
-        <div class="rows">
-          <div class="row"><button data-act="rowAdd">＋ 줄 추가</button><button data-act="colAdd">＋ 칸 추가</button></div>
-          <div class="row"><button data-act="rowDel">－ 줄 지우기</button><button data-act="colDel">－ 칸 지우기</button></div>
-        </div>
-        <div class="glabel">줄 · 칸 (표 안을 누른 뒤 사용)</div>
-      </div>
-      <div class="group">
-        <div class="row">
-          <button class="big" data-act="tblDel"><i data-ico="trash"></i>표 지우기</button>
-        </div>
-        <div class="glabel">지우기</div>
-      </div>
-    </div>
+    </section>
 
-    <!-- 쪽 -->
-    <div class="panel" data-panel="page" hidden>
-      <div class="group">
-        <div class="row">
-          <button class="big" data-orient="portrait"><i data-ico="portrait"></i>세로</button>
-          <button class="big" data-orient="landscape"><i data-ico="landscape"></i>가로</button>
+    <section id="faq" class="alt">
+      <div class="wrap">
+        <h2>자주 묻는 질문</h2>
+        <p class="sec-lead">궁금한 점을 눌러 보세요.</p>
+        <div class="faq">
+          <details><summary>정말 무료인가요?</summary><p>네. 모든 기능을 무료로 씁니다. 결제나 카드 등록이 없습니다.</p></details>
+          <details><summary>한글 프로그램이 없어도 hwp 파일을 열 수 있나요?</summary><p>네. 한컴오피스 없이 브라우저에서 hwp·hwpx 파일을 열고 고치고 저장합니다.</p></details>
+          <details><summary>맥이나 크롬북에서도 되나요?</summary><p>네. 크롬·엣지 같은 최신 브라우저가 있으면 웹판을 바로 씁니다. 설치형은 윈도우용입니다.</p></details>
+          <details><summary>회원가입을 해야 하나요?</summary><p>아니요. 편집은 가입 없이 됩니다. 클라우드 저장·공유를 쓸 때만 아이디나 Google 계정으로 로그인합니다.</p></details>
+          <details><summary>내 문서가 서버로 올라가나요?</summary><p>아니요. 열고 고치는 일은 모두 내 컴퓨터 안에서 합니다. 클라우드에 저장할 때만 내 컴퓨터에서 암호화한 뒤 올라갑니다.</p></details>
+          <details><summary>한글 2024와 똑같이 보이나요?</summary><p>실제 문서 68개를 비교한 평균 일치율이 97%입니다. 아주 복잡한 문서는 조금 다르게 보일 수 있어, 계속 맞춰 가고 있습니다.</p></details>
+          <details><summary>한컴(한글과컴퓨터)에서 만든 프로그램인가요?</summary><p>아니요. 한글과컴퓨터와 관계없는 개인이 만든 무료 프로그램입니다.</p></details>
         </div>
-        <div class="glabel">용지 방향 (A4)</div>
       </div>
-      <div class="group">
-        <div class="row">
-          <button class="big" data-margin="narrow"><i data-ico="marginnarrow"></i>좁게</button>
-          <button class="big" data-margin="normal"><i data-ico="marginnormal"></i>보통</button>
-          <button class="big" data-margin="wide"><i data-ico="marginwide"></i>넓게</button>
-        </div>
-        <div class="glabel">쪽 여백</div>
-      </div>
-      <div class="group">
-        <div class="row">
-          <button class="big" data-act="hf"><i data-ico="header"></i>머리말 · 꼬리말</button>
-          <button class="big" data-act="hfNum"><i data-ico="pagenum"></i>쪽 번호</button>
-        </div>
-        <div class="glabel">머리말 · 꼬리말</div>
-      </div>
-    </div>
+    </section>
 
-    <!-- 보기 -->
-    <div class="panel" data-panel="view" hidden>
-      <div class="group">
-        <div class="row">
-          <button class="big" data-act="zoomOut"><i data-ico="zoomout"></i>축소</button>
-          <button class="big" data-act="zoomIn"><i data-ico="zoomin"></i>확대</button>
-          <button class="big" data-act="zoom100"><i data-ico="zoom100"></i>100%</button>
-          <button class="big" data-act="zoomFit"><i data-ico="zoomfit"></i>폭 맞춤</button>
+    <div class="final">
+      <div class="wrap">
+        <h2>지금 바로 hwp 파일을 열어 보세요</h2>
+        <p>무료 · 설치 없이 · 회원가입 없이</p>
+        <div class="cta" style="margin:0">
+          <a class="btn main" href="./app.html">지금 시작하기 →</a>
+          <a class="btn sub" href="https://github.com/sion-dev404/hangul-editor/releases/latest">Windows 설치 파일 받기</a>
         </div>
-        <div class="glabel">화면 확대</div>
-      </div>
-      <div class="group">
-        <div class="row">
-          <button class="big" data-act="guides" id="guideBtn"><i data-ico="guides"></i>쪽 경계</button>
-        </div>
-        <div class="glabel">표시</div>
-      </div>
-    </div>
-  </section>
-
-  <!-- 서식 줄: 한글처럼 탭을 바꿔도 늘 보이는 글꼴·크기·정렬 줄 -->
-  <div class="fmtbar" id="fmtBar">
-    <select id="styleSel" title="스타일">
-      <option value="p">바탕글</option>
-      <option value="h1">제목 1</option>
-      <option value="h2">제목 2</option>
-      <option value="h3">제목 3</option>
-    </select>
-    <select id="fontSel" title="글꼴">
-      <option value="맑은 고딕">맑은 고딕</option>
-      <option value="바탕">바탕</option>
-      <option value="굴림">굴림</option>
-      <option value="돋움">돋움</option>
-      <option value="궁서">궁서</option>
-      <option value="Nanum Gothic">나눔고딕</option>
-      <option value="Nanum Myeongjo">나눔명조</option>
-      <option value="Noto Sans KR">본고딕</option>
-      <option value="Noto Serif KR">본명조</option>
-    </select>
-    <select id="sizeSel" title="글자 크기"></select>
-    <span class="sep"></span>
-    <button class="sq" data-cmd="bold" title="진하게"><b>가</b></button>
-    <button class="sq" data-cmd="italic" title="기울임"><em>가</em></button>
-    <button class="sq" data-cmd="underline" title="밑줄"><u>가</u></button>
-    <button class="sq" data-cmd="strikeThrough" title="취소선"><s>가</s></button>
-    <button class="sq" data-pop="popColor" title="글자 색"><span class="colorA">가</span></button>
-    <button class="sq" data-pop="popHilite" title="형광펜"><span class="hiliteA">가</span></button>
-    <span class="sep"></span>
-    <button class="sq" data-cmd="justifyLeft" title="왼쪽 정렬"><svg viewBox="0 0 16 16"><path d="M1 3h14M1 6.5h9M1 10h14M1 13.5h9" stroke="currentColor" stroke-width="1.5" fill="none"/></svg></button>
-    <button class="sq" data-cmd="justifyCenter" title="가운데 정렬"><svg viewBox="0 0 16 16"><path d="M1 3h14M4 6.5h8M1 10h14M4 13.5h8" stroke="currentColor" stroke-width="1.5" fill="none"/></svg></button>
-    <button class="sq" data-cmd="justifyRight" title="오른쪽 정렬"><svg viewBox="0 0 16 16"><path d="M1 3h14M6 6.5h9M1 10h14M6 13.5h9" stroke="currentColor" stroke-width="1.5" fill="none"/></svg></button>
-    <button class="sq" data-cmd="justifyFull" title="양쪽 정렬"><svg viewBox="0 0 16 16"><path d="M1 3h14M1 6.5h14M1 10h14M1 13.5h14" stroke="currentColor" stroke-width="1.5" fill="none"/></svg></button>
-    <label class="inl">줄 간격
-      <select id="lineSel" title="줄 간격">
-        <option value="1">100%</option>
-        <option value="1.3">130%</option>
-        <option value="1.6">160%</option>
-        <option value="1.8">180%</option>
-        <option value="2">200%</option>
-        <option value="2.5">250%</option>
-        <option value="3">300%</option>
-      </select>
-    </label>
-    <span class="sep"></span>
-    <button data-cmd="insertUnorderedList" title="글머리표">● 글머리표</button>
-    <button data-cmd="insertOrderedList" title="문단 번호">1. 번호</button>
-    <button data-cmd="outdent" title="내어쓰기">⇤</button>
-    <button data-cmd="indent" title="들여쓰기">⇥</button>
-  </div>
-  </div>
-
-  <div id="studioHost"></div>
-
-  <main class="workspace" id="workspace">
-    <div id="holder">
-      <div id="page">
-        <div id="hdrView" class="hfview" hidden title="눌러서 머리말을 고칩니다"></div>
-        <div id="guides"></div>
-        <div id="editor" contenteditable="true" spellcheck="false"></div>
-        <div id="ftrView" class="hfview" hidden title="눌러서 꼬리말을 고칩니다"></div>
       </div>
     </div>
   </main>
 
-  <footer class="status" id="docxStatus">
-    <span id="stat"></span>
-    <span class="grow"></span>
-    <button data-act="zoomOut" class="mini" title="축소">－</button>
-    <input type="range" id="zoomSlider" min="30" max="300" step="5" value="100" aria-label="화면 확대" />
-    <button data-act="zoomIn" class="mini" title="확대">＋</button>
-    <span id="zoomLabel">100%</span>
-    <button data-act="zoomFit" class="mini wide" title="폭 맞춤">폭 맞춤</button>
+  <footer>
+    <div class="wrap">
+      <div class="row">
+        <a href="https://hangul-editor-cloud.hangul-editor-cloud.workers.dev/terms">이용약관</a>
+        <a href="https://hangul-editor-cloud.hangul-editor-cloud.workers.dev/privacy">개인정보처리방침</a>
+        <a href="https://github.com/sion-dev404/hangul-editor">GitHub</a>
+        <a href="https://github.com/sion-dev404/hangul-editor/releases">설치 파일·변경 기록</a>
+      </div>
+      <p>문서 엔진 <a href="https://github.com/sion-dev404/hwpcore">hwpcore</a>는 오픈소스 <a href="https://github.com/edwardkim/rhwp">rhwp</a>(MIT 라이선스, Edward Kim)를 바탕으로 만들었습니다. 글꼴은 공공누리 제1유형 글꼴을 출처 표시 조건으로 담았습니다.</p>
+      <p>"한글"·"한컴오피스"는 ㈜한글과컴퓨터, "워드"는 Microsoft Corporation의 상표이며, 이 프로그램은 이들 회사와 관계가 없습니다.</p>
+    </div>
   </footer>
-
-  <!-- 팝업 -->
-  <div class="pop" id="popColor" hidden></div>
-  <div class="pop" id="popHilite" hidden></div>
-  <div class="pop" id="popTable" hidden>
-    <div id="tblGrid"></div>
-    <div id="tblLabel">줄 × 칸을 고르세요</div>
-  </div>
-  <div class="pop" id="popChars" hidden></div>
-
-  <div class="dialog" id="findDlg" hidden>
-    <div class="dlgTitle">찾아 바꾸기 <button data-act="findClose" class="mini">✕</button></div>
-    <label>찾을 말 <input id="findText" /></label>
-    <label>바꿀 말 <input id="replText" /></label>
-    <div class="row">
-      <button data-act="findNext">다음 찾기</button>
-      <button data-act="replOne">바꾸기</button>
-      <button data-act="replAll">모두 바꾸기</button>
-    </div>
-  </div>
-
-  <div class="dialog" id="hfDlg" hidden>
-    <div class="dlgTitle">머리말 · 꼬리말 <button data-act="hfClose" class="mini">✕</button></div>
-    <label>머리말 <input id="hfHeader" placeholder="모든 쪽 위에 들어갈 글" /></label>
-    <label>정렬
-      <select id="hfHeaderAlign"><option value="left">왼쪽</option><option value="center">가운데</option><option value="right">오른쪽</option></select>
-    </label>
-    <label>꼬리말 <input id="hfFooter" placeholder="모든 쪽 아래에 들어갈 글" /></label>
-    <label>정렬
-      <select id="hfFooterAlign"><option value="left">왼쪽</option><option value="center">가운데</option><option value="right">오른쪽</option></select>
-    </label>
-    <label class="chk"><input type="checkbox" id="hfPageNum" /> 쪽 번호 넣기</label>
-    <label>번호 모양
-      <select id="hfNumStyle"><option value="plain">1</option><option value="dash">- 1 -</option><option value="of">1 쪽</option></select>
-    </label>
-    <label>번호 위치
-      <select id="hfNumPos">
-        <option value="footer-center">꼬리말 가운데</option>
-        <option value="footer-right">꼬리말 오른쪽</option>
-        <option value="footer-left">꼬리말 왼쪽</option>
-        <option value="header-right">머리말 오른쪽</option>
-        <option value="header-center">머리말 가운데</option>
-      </select>
-    </label>
-    <p id="hfNote" class="note" hidden></p>
-    <div class="row">
-      <button data-act="hfApply">확인</button>
-      <button data-act="hfRemove">모두 지우기</button>
-    </div>
-  </div>
-
-  <div id="toast" hidden></div>
-  <div id="exportStage" aria-hidden="true"></div>
-  <input type="file" id="fileDocx" accept=".docx,.hwp,.hwpx" hidden />
-  <input type="file" id="fileImg" accept="image/png,image/jpeg,image/gif" hidden />
-
-  <script type="module" src="/src/main.js"></script>
 </body>
 </html>

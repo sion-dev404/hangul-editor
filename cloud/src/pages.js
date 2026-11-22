@@ -26,7 +26,7 @@ export function homePage() {
 <img class="logo" src="/logo.svg" alt="" width="64" height="64">
 <h1>한글 편집기</h1>
 <p class="sub">한컴오피스·MS 오피스 없이 한글(HWP·HWPX)과 워드(DOCX) 문서를 한 프로그램에서 열고, 고치고, 서로 바꾸는 무료 문서 편집기입니다.</p>
-<div class="btns"><a href="${WEB}">웹에서 바로 쓰기</a><a class="alt" href="${REPO}/releases/latest">Windows 설치 파일 받기</a></div>
+<div class="btns"><a href="${WEB}app.html">웹에서 바로 쓰기</a><a class="alt" href="${REPO}/releases/latest">Windows 설치 파일 받기</a></div>
 <h2>이 주소는 무엇인가요?</h2>
 <p>한글 편집기의 <b>클라우드 서버</b>입니다. 편집기에서 "클라우드에 저장"을 누르면 문서가 이곳에 보관되고, 공유 링크로 다른 사람과 함께 보거나 고칠 수 있습니다.</p>
 <ul>

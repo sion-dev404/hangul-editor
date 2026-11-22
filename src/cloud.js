@@ -6,7 +6,7 @@
 // - 내 문서함(기본 켜짐): 로그인하면 연·저장한 클라우드 문서의 열쇠를 서버 보관함에 둔다(서버 비밀키로 다시 잠금).
 //   어느 PC에서나 목록에서 바로 연다. 끄면 보관 열쇠를 모두 지우고 링크로만 연다(서버도 못 여는 최고 보안).
 
-const WEB_URL = 'https://sion-dev404.github.io/hangul-editor/';
+const WEB_URL = 'https://sion-dev404.github.io/hangul-editor/app.html';
 // 배포한 서버 주소 (wrangler deploy 뒤에 적는다). 개발 서버(5173·5198·5199)에서는 로컬 서버(wrangler dev)를 쓴다.
 const PROD_API = 'https://hangul-editor-cloud.hangul-editor-cloud.workers.dev';
 const DEV = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) && ['5173', '5198', '5199'].includes(location.port);

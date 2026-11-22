@@ -17,6 +17,11 @@
 - **이 편집기로 저장한 docx**에는 원본 HTML(`hangulEditor/content.xml`)과 `word/document.xml`의 지문(`docHash`)을 넣는다. 다른 프로그램에서 고쳐 지문이 다르면 원본 대신 워드 내용을 읽는다.
 - **한글 → 워드(hwpx-import)**: 문서에 저장된 줄 배치(lineseg)로 줄 높이를 정하고, 떠 있는 그림은 같은 기준·거리의 떠 있는 그림으로, 바탕쪽 그림은 머리글 안 "글 뒤" 그림으로, 글 없는 도형(배경 띠·점선 답 칸)은 덮는 문단의 음영·테두리로 옮긴다. WMF 그림은 `src/wmf.js`가 PNG로 그린다.
 
+## 웹판 주소 구성 (홍보 페이지)
+- `index.html` = 홍보 페이지(검색에 걸리는 첫 화면, 제목·설명·og·FAQ 구조화 자료). "지금 시작하기" → `app.html`(편집기). 그림은 `public/landing/`(editor.png = 편집기 화면, og.png = 링크 미리보기 1200×630, icon-180.png). `public/robots.txt`, `public/sitemap.xml`.
+- 편집기는 `app.html`. 설치형(`electron/main.cjs`)도 `app.html`을 연다. 공유 링크는 `.../app.html#cloud=…`(`src/cloud.js` WEB_URL). 예전 링크 `.../hangul-editor/#cloud=…`는 `index.html` 맨 앞 스크립트가 `app.html`로 넘긴다.
+- `vite.config.js`의 `rollupOptions.input`에 두 쪽을 모두 적어야 빌드에 들어간다.
+
 ## 화면 구성 (한글 2024식 밝은 화면)
 - 제목 줄: 로고 · 빠른 실행(새 문서·열기·저장·인쇄·되돌리기·다시 실행, 화면 종류별로 `#quickDocx`/`#quickHwp`) · 문서 이름(가운데) · 종류 · 저장 상태.
 - 탭 + 리본, 그 아래 서식 줄. 한글 화면의 서식 줄은 rhwp 안에 있고, 워드 화면의 서식 줄은 `#fmtBar`(스타일·글꼴·크기·굵게·정렬·줄 간격·목록)다.

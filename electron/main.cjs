@@ -93,7 +93,7 @@ if (!app.requestSingleInstanceLock()) {
       webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false },
     });
     win.setMenu(null);
-    win.loadURL(`${origin}/index.html`);
+    win.loadURL(`${origin}/app.html`);
     win.webContents.setWindowOpenHandler(({ url }) => {
       if (url.startsWith(origin)) return { action: 'allow' }; // 인쇄 미리 보기 같은 편집기 자체 창
       if (/^https?:/i.test(url)) shell.openExternal(url);
