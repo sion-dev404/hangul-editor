@@ -31,6 +31,7 @@
 //   GET    /api/docs/:id/live           WebSocket: {type:'version'|'lock'|'deleted', ...}
 
 import { homePage, privacyPage, termsPage } from './pages.js';
+import { CLOUD_LOGO_SVG } from './logo.js';
 import { Account, ID_PRINCIPAL_RE, checkPassword, checkUsername, cleanNick, AVATAR_MAX } from './accounts.js';
 export { Account };
 
@@ -379,6 +380,7 @@ export default {
       if (url.pathname === '/auth/google/start' || url.pathname === '/auth/dev/start') return await authStart(url, env);
       if (url.pathname === '/auth/google/callback') return await authCallback(url, env);
       if (url.pathname === '/' || url.pathname === '/index.html') return new Response(homePage(), { headers: { ...SEC_HEADERS, 'Cache-Control': 'public, max-age=600' } });
+      if (url.pathname === '/logo.svg' || url.pathname === '/favicon.ico') return new Response(CLOUD_LOGO_SVG, { headers: { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'public, max-age=86400', 'X-Content-Type-Options': 'nosniff' } });
       if (url.pathname === '/terms') return new Response(termsPage(), { headers: { ...SEC_HEADERS, 'Cache-Control': 'public, max-age=600' } });
       if (url.pathname === '/privacy') return new Response(privacyPage(), { headers: { ...SEC_HEADERS, 'Cache-Control': 'public, max-age=600' } });
       if (!url.pathname.startsWith('/api/')) return new Response('찾는 페이지가 없습니다', { status: 404, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });

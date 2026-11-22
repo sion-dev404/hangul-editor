@@ -4,7 +4,7 @@ const REPO = 'https://github.com/sion-dev404/hangul-editor';
 const UPDATED = '2026년 11월 22일';
 
 const shell = (title, body) => `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${title}</title><style>
+<title>${title}</title><link rel="icon" type="image/svg+xml" href="/logo.svg"><style>
 :root{--ink:#1d2430;--sub:#5b6575;--line:#e1e5ea;--blue:#2f6fd6;--bg:#f3f5f8}
 @media (prefers-color-scheme:dark){:root{--ink:#e6e9ef;--sub:#a9b2c0;--line:#2c3442;--blue:#7aa7f0;--bg:#141922}}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15.5px/1.75 "Malgun Gothic","Apple SD Gothic Neo",sans-serif;word-break:keep-all}
@@ -13,7 +13,7 @@ main{max-width:760px;margin:0 auto;padding:40px 18px 60px}
 @media (prefers-color-scheme:dark){.card{background:#1b2230}}
 h1{font-size:26px;margin:0 0 6px}h2{font-size:18px;margin:28px 0 6px;padding-top:14px;border-top:1px solid var(--line)}
 p,li{color:var(--ink)}.sub{color:var(--sub)}a{color:var(--blue)}
-.logo{width:56px;height:56px;border-radius:14px;background:#2f6fd6;color:#fff;display:grid;place-items:center;font-size:30px;font-weight:700;margin-bottom:14px}
+.logo{width:64px;height:64px;display:block;margin-bottom:14px}
 .btns{display:flex;gap:10px;flex-wrap:wrap;margin:18px 0 4px}.btns a{background:var(--blue);color:#fff;text-decoration:none;border-radius:10px;padding:10px 16px;font-weight:700}
 .btns a.alt{background:transparent;color:var(--blue);border:1px solid var(--blue)}
 footer{margin-top:22px;font-size:13px;color:var(--sub);text-align:center}
@@ -23,7 +23,7 @@ table{border-collapse:collapse;width:100%;font-size:14.5px}td,th{border-bottom:1
 
 export function homePage() {
   return shell('한글 편집기', `
-<div class="logo">한</div>
+<img class="logo" src="/logo.svg" alt="" width="64" height="64">
 <h1>한글 편집기</h1>
 <p class="sub">한컴오피스·MS 오피스 없이 한글(HWP·HWPX)과 워드(DOCX) 문서를 한 프로그램에서 열고, 고치고, 서로 바꾸는 무료 문서 편집기입니다.</p>
 <div class="btns"><a href="${WEB}">웹에서 바로 쓰기</a><a class="alt" href="${REPO}/releases/latest">Windows 설치 파일 받기</a></div>

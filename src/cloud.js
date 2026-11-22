@@ -345,6 +345,7 @@ const CSS = `
 #cloudDlg::backdrop{background:rgba(20,30,50,.35)}
 #cloudDlg .hd{display:flex;align-items:center;justify-content:space-between;padding:16px 20px 6px}
 #cloudDlg .hd b{font-size:17px}
+#cloudDlg .hd .ttl{display:flex;align-items:center;gap:9px}
 #cloudDlg .x{border:0;background:none;font-size:18px;color:#8a93a3;cursor:pointer;padding:4px 8px}
 #cloudDlg .bd{padding:6px 20px 18px}
 #cloudDlg .sec{margin-top:14px}
@@ -439,7 +440,7 @@ function dialog(title, body) {
   ensureUi();
   document.getElementById('cloudDlg')?.remove();
   const d = document.createElement('dialog'); d.id = 'cloudDlg';
-  d.innerHTML = '<div class="hd"><b></b><button class="x" title="닫기">✕</button></div><div class="bd"></div>';
+  d.innerHTML = '<div class="hd"><span class="ttl"><img src="./cloud-logo.svg" width="26" height="26" alt=""><b></b></span><button class="x" title="닫기">✕</button></div><div class="bd"></div>';
   d.querySelector('b').textContent = title;
   d.querySelector('.bd').append(body);
   d.querySelector('.x').addEventListener('click', () => d.close());

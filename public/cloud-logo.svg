@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+<!-- 한글 편집기 클라우드 로고: 구름 캐릭터. 프로그램 로고(ㅎ 캐릭터)와 같은 얼굴 -->
+<defs>
+<linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1fb3a6"/><stop offset="1" stop-color="#139c90"/></linearGradient>
+<linearGradient id="gl" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".12"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+<linearGradient id="gw" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#e9eef7"/></linearGradient>
+<filter id="sh" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="1.5" stdDeviation="1.2" flood-color="#000" flood-opacity=".16"/></filter>
+</defs>
+<path d="M32 2C10 2 2 10 2 32s8 30 30 30 30-8 30-30S54 2 32 2z" fill="url(#bg)"/>
+<path d="M32 2C10 2 2 10 2 32h60C62 10 54 2 32 2z" fill="url(#gl)"/>
+<g filter="url(#sh)">
+<path d="M19 48h28a10.5 10.5 0 0 0 1.6-20.9A15 15 0 0 0 19.8 25.2A11.5 11.5 0 0 0 19 48z" fill="url(#gw)"/>
+</g>
+<circle cx="28" cy="37" r="2.1" fill="#0b3b3a"/>
+<circle cx="37" cy="37" r="2.1" fill="#0b3b3a"/>
+<path d="M29.5 42c1.8 1.7 4.2 1.7 6 0" fill="none" stroke="#0b3b3a" stroke-width="1.9" stroke-linecap="round"/>
+</svg>

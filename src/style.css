@@ -212,7 +212,7 @@ body[data-mode="hwp"] #quickDocx, body[data-mode="docx"] #quickHwp { display: no
 :root { --accent: #1a6fd1; --ink: #2a2f36; --paper-bg: #eceef1; }
 body { background: var(--paper-bg); color: var(--ink); }
 .titlebar { background: #fff; color: var(--ink); border-top: 3px solid var(--accent); border-bottom: 1px solid var(--line); padding: 3px 12px; gap: 8px; }
-.logo { background: var(--accent); color: #fff; }
+.logo { background: none; border-radius: 0; display: block; }
 #docName { color: var(--ink); text-align: center; max-width: none; font-weight: 600; }
 #docName:hover, #docName:focus { border-color: #b8cdea; background: #f3f8fe; }
 #modeBadge { margin-left: 0; background: #e6effc; color: var(--accent); }

@@ -20,6 +20,7 @@
 ## 화면 구성 (한글 2024식 밝은 화면)
 - 제목 줄: 로고 · 빠른 실행(새 문서·열기·저장·인쇄·되돌리기·다시 실행, 화면 종류별로 `#quickDocx`/`#quickHwp`) · 문서 이름(가운데) · 종류 · 저장 상태.
 - 탭 + 리본, 그 아래 서식 줄. 한글 화면의 서식 줄은 rhwp 안에 있고, 워드 화면의 서식 줄은 `#fmtBar`(스타일·글꼴·크기·굵게·정렬·줄 간격·목록)다.
+- **로고(3.5.0, 사용자 선택)**: 프로그램 = `public/logo.svg`(주황 ㅎ 캐릭터), 클라우드 = `public/cloud-logo.svg`(청록 구름 캐릭터, 서버용 사본 `cloud/src/logo.js` → `/logo.svg`). 설치판 아이콘은 `npx electron tools/make-icon.cjs public/logo.svg build/icon.png 512`(VS Code 터미널은 ELECTRON_RUN_AS_NODE 지우고)로 만들고, `make-setup.mjs`가 .ico와 설치 화면 로고를 여기서 만든다. 시안 캔버스: https://claude.ai/artifact/9WntvYPmeacj6SVxq9tGGP
 - 아이콘은 `src/icons.js`에서 직접 그린 SVG만 쓴다. 한컴·마이크로소프트의 아이콘·로고·그림은 저작권·상표 문제로 쓰지 않는다. 버튼에는 `data-ico="이름"`을 달면 채워진다.
 - **자동 복구**: 한글 화면은 고친 내용이 있으면 15초마다 문서를 IndexedDB(`src/recovery.js`, 키 `hwp`)에 넣고, 저장하면 지운다. 다음 실행에서 되살릴지 묻는다. 워드 화면은 localStorage에 저장하고, 용량이 넘으면 IndexedDB(키 `docx`)에 넣는다.
 - **머리말·꼬리말(워드 화면)**: `doc.parts = { header, footer }`(HTML). 화면 맨 위·아래 여백에 미리 보이고(`#hdrView`/`#ftrView`), 눌러서 대화 상자(`#hfDlg`)로 고친다. 쪽 번호는 `span[data-field=page]`로 저장 때 워드의 쪽 번호 필드가 된다. 인쇄(PDF)에는 아직 들어가지 않는다.
