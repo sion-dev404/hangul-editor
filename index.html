@@ -139,6 +139,8 @@
     footer { padding: 36px 0 48px; font-size: 13px; color: var(--sub); border-top: 1px solid var(--line); }
     footer .row { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-bottom: 12px; }
     footer p { margin: 4px 0; }
+    .mail-show { font: inherit; color: var(--brand-d); background: var(--brand-soft); border: 1px solid #fbd3c6; border-radius: 8px; padding: 2px 10px; cursor: pointer; }
+    .mail-show:hover { background: #ffe4da; }
 
     @media (max-width: 900px) {
       .grid, .steps { grid-template-columns: 1fr 1fr; }
@@ -259,7 +261,7 @@
           <details><summary>내 문서가 서버로 올라가나요?</summary><p>아니요. 열고 고치는 일은 모두 내 컴퓨터 안에서 합니다. 클라우드에 저장할 때만 내 컴퓨터에서 암호화한 뒤 올라갑니다.</p></details>
           <details><summary>한글 2024와 똑같이 보이나요?</summary><p>실제 문서 68개를 비교한 평균 일치율이 97%입니다. 아주 복잡한 문서는 조금 다르게 보일 수 있어, 계속 맞춰 가고 있습니다.</p></details>
           <details><summary>한컴(한글과컴퓨터)에서 만든 프로그램인가요?</summary><p>아니요. 한글과컴퓨터와 관계없는 개인이 만든 무료 프로그램입니다.</p></details>
-          <details><summary>문의하거나 오류를 알리고 싶어요</summary><p>이메일 <a href="mailto:redsionkim@gmail.com">redsionkim@gmail.com</a>으로 보내 주세요. 열리지 않는 문서가 있으면 어떤 화면에서 무엇을 하다 생겼는지 함께 알려 주시면 빨리 고칠 수 있습니다.</p></details>
+          <details><summary>문의하거나 오류를 알리고 싶어요</summary><p>이메일로 보내 주세요. 열리지 않는 문서가 있으면 어떤 화면에서 무엇을 하다 생겼는지 함께 알려 주시면 빨리 고칠 수 있습니다.<br />이메일: <button type="button" class="mail-show">이메일 주소 보기</button></p></details>
         </div>
       </div>
     </section>
@@ -279,7 +281,7 @@
   <footer>
     <div class="wrap">
       <div class="row">
-        <a href="mailto:redsionkim@gmail.com">문의: redsionkim@gmail.com</a>
+        <span>문의: <button type="button" class="mail-show">이메일 주소 보기</button></span>
         <a href="https://hangul-editor-cloud.hangul-editor-cloud.workers.dev/terms">이용약관</a>
         <a href="https://hangul-editor-cloud.hangul-editor-cloud.workers.dev/privacy">개인정보처리방침</a>
         <a href="https://github.com/sion-dev404/hangul-editor">GitHub</a>
@@ -289,5 +291,17 @@
       <p>"한글"·"한컴오피스"는 ㈜한글과컴퓨터, "워드"는 Microsoft Corporation의 상표이며, 이 프로그램은 이들 회사와 관계가 없습니다.</p>
     </div>
   </footer>
+  <script>
+    // 스팸 수집 프로그램이 주소를 긁어 가지 않도록, 누를 때만 주소를 조립해 보여 준다
+    document.querySelectorAll('.mail-show').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var m = ['redsionkim', 'gmail.com'].join(String.fromCharCode(64));
+        var a = document.createElement('a');
+        a.href = 'mai' + 'lto:' + m;
+        a.textContent = m;
+        b.replaceWith(a);
+      });
+    });
+  </script>
 </body>
 </html>
