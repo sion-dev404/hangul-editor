@@ -6,7 +6,7 @@
 // - 권한: 문서 만들기·저장·잠금·되돌리기 = 로그인 + (주인 또는 주인이 지정한 이메일). 지우기·편집자 지정 = 주인만. 보기 = 링크(열쇠)만 있으면.
 // - 문서마다 Durable Object(DocRoom) 하나: 권한, 편집 잠금, 버전 목록, 실시간 알림(WebSocket), 버전 파일(1MB 조각)
 //
-// 비밀값(wrangler secret put): GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, SESSION_SECRET
+// 비밀값(wrangler secret put): GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, SESSION_SECRET, ADMIN_KEY(운영자 문의함 /admin#k=…)
 // 로컬 시험(.dev.vars): DEV_LOGIN=1 이면 /auth/dev/start?email=… 로 Google 없이 로그인 (배포본에는 없음)
 //
 // API
@@ -34,6 +34,8 @@ import { homePage, privacyPage, termsPage } from './pages.js';
 import { CLOUD_LOGO_SVG } from './logo.js';
 import { Account, ID_PRINCIPAL_RE, checkPassword, checkUsername, cleanNick, AVATAR_MAX } from './accounts.js';
 export { Account };
+import { Inbox, adminPage, checkContact } from './inbox.js';
+export { Inbox };
 
 const ID_RE = /^[A-Za-z0-9_-]{22}$/;
 const AUTHOR_MAX = 600;
@@ -383,10 +385,29 @@ export default {
       if (url.pathname === '/logo.svg' || url.pathname === '/favicon.ico') return new Response(CLOUD_LOGO_SVG, { headers: { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'public, max-age=86400', 'X-Content-Type-Options': 'nosniff' } });
       if (url.pathname === '/terms') return new Response(termsPage(), { headers: { ...SEC_HEADERS, 'Cache-Control': 'public, max-age=600' } });
       if (url.pathname === '/privacy') return new Response(privacyPage(), { headers: { ...SEC_HEADERS, 'Cache-Control': 'public, max-age=600' } });
+      // 운영자 문의함 (열쇠 ADMIN_KEY가 맞을 때만)
+      if (url.pathname === '/admin') return new Response(adminPage(), { headers: SEC_HEADERS });
+      if (url.pathname.startsWith('/admin/api/')) {
+        if (!env.ADMIN_KEY || !sameStr(req.headers.get('X-Admin-Key') || '', env.ADMIN_KEY)) return json({ error: 'key' }, 403);
+        const inbox = env.INBOX.get(env.INBOX.idFromName('inbox'));
+        if (url.pathname === '/admin/api/list' && req.method === 'GET') return inbox.fetch('https://inbox/list');
+        if (url.pathname === '/admin/api/delete' && req.method === 'POST') return inbox.fetch('https://inbox/delete', { method: 'POST', body: await req.text() });
+        return json({ error: 'not found' }, 404);
+      }
       if (!url.pathname.startsWith('/api/')) return new Response('찾는 페이지가 없습니다', { status: 404, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
       // 허용된 편집기 화면에서만 쓴다
       if (!('Access-Control-Allow-Origin' in h)) return json({ error: 'origin' }, 403, h);
 
+      if (url.pathname === '/api/contact' && req.method === 'POST') {
+        const b = await req.json().catch(() => null);
+        const c = checkContact(b);
+        if (c.spam) return json({ ok: true }, 200, h); // 로봇에게는 받은 척만 한다
+        if (c.error) return json(c, 400, h);
+        if (!(await ipLimit(env, req, 'contact', Number(env.CONTACTS_PER_DAY) || 5))) return withCors(tooMany(), h);
+        const inbox = env.INBOX.get(env.INBOX.idFromName('inbox'));
+        const res = await inbox.fetch('https://inbox/add', { method: 'POST', body: JSON.stringify(c.item) });
+        return withCors(res, h);
+      }
       if (url.pathname === '/api/auth/exchange' && req.method === 'POST') return withCors(await authExchange(req, env), h);
       if (url.pathname === '/api/auth/signup' && req.method === 'POST') return withCors(await signup(req, env), h);
       if (url.pathname === '/api/auth/login' && req.method === 'POST') return withCors(await passwordLogin(req, env, false), h);

@@ -32,6 +32,14 @@ class_name = "Account"
 tag = "v3"
 new_sqlite_classes = ["Account"]
 
+[[durable_objects.bindings]]
+name = "INBOX"
+class_name = "Inbox"
+
+[[migrations]]
+tag = "v4"
+new_sqlite_classes = ["Inbox"]
+
 [vars]
 # 이 주소에서 연 편집기만 서버를 쓸 수 있다 (웹판, 설치형 내장 서버, 개발 서버)
 ALLOWED_ORIGINS = "https://sion-dev404.github.io,http://127.0.0.1:47615,http://localhost:5173,http://localhost:5199,http://localhost:5198"
@@ -40,3 +48,4 @@ KEEP_VERSIONS = "20"        # 문서마다 남기는 버전 수
 CREATES_PER_DAY = "40"      # 접속 주소(IP) 하나가 하루에 만들 수 있는 문서 수
 LOCK_SECONDS = "90"         # 편집 잠금 유지 시간 (편집기가 30초마다 연장)
 SIGNUPS_PER_DAY = "10"      # 접속 주소(IP) 하나가 하루에 만들 수 있는 아이디 수
+CONTACTS_PER_DAY = "5"      # 접속 주소(IP) 하나가 하루에 보낼 수 있는 문의 수

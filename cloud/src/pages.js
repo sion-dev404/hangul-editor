@@ -1,7 +1,7 @@
 // 클라우드 서버 주소에서 보여 주는 안내 페이지 (Google 로그인 등록에 필요한 홈페이지·개인정보처리방침)
 const WEB = 'https://sion-dev404.github.io/hangul-editor/';
 const REPO = 'https://github.com/sion-dev404/hangul-editor';
-const UPDATED = '2026년 11월 22일';
+const UPDATED = '2026년 11월 24일';
 
 const shell = (title, body) => `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${title}</title><link rel="icon" type="image/svg+xml" href="/logo.svg"><style>
@@ -69,7 +69,7 @@ export function termsPage() {
 <h2>6. 책임의 한계</h2>
 <p>서비스는 무료로 "있는 그대로" 제공됩니다. 운영자는 고의나 중대한 과실이 없는 한 서비스 중단, 데이터 손실, 회원의 비밀번호·링크 관리 소홀로 생긴 손해에 책임지지 않습니다.</p>
 <h2>7. 약관 변경과 문의</h2>
-<p>약관이 바뀌면 시행 7일 전에 이 페이지에 알립니다. 문의는 <a href="${REPO}/issues">GitHub 저장소의 문의(Issues)</a>로 남겨 주세요.</p>`);
+<p>약관이 바뀌면 시행 7일 전에 이 페이지에 알립니다. 문의는 <a href="${WEB}#contact">웹판의 문의 양식</a>이나 <a href="${REPO}/issues">GitHub 저장소의 문의(Issues)</a>로 남겨 주세요.</p>`);
 }
 
 export function privacyPage() {
@@ -91,6 +91,7 @@ export function privacyPage() {
 <tr><td>Google 계정 이름</td><td>편집기 화면에 "○○님 편집 중"으로 표시 (암호화되어 저장되어 서버는 읽을 수 없음)</td><td>해당 문서가 지워질 때까지</td></tr>
 <tr><td>Google 계정 고유 번호</td><td>하루에 만들 수 있는 문서 수 제한(남용 방지)</td><td>당일 횟수만, 다음 날 덮어씀</td></tr>
 <tr><td>내 문서함: 문서 열쇠·파일 이름·종류·내 역할</td><td>어느 PC에서나 로그인만으로 내 클라우드 문서 목록을 보고 열기 위함. 서버 비밀키로 다시 잠가 계정별로 보관</td><td>목록에서 빼거나, 내 문서함을 끄거나, 문서가 지워질 때까지</td></tr>
+<tr><td>문의 양식: 문의 종류·내용, 답장 받을 이메일(선택)</td><td>문의에 답하고 오류를 고치기 위함. 운영자만 봄</td><td>처리가 끝나면 지우며, 늦어도 1년 안에 지움</td></tr>
 <tr><td>로그인 유지 표</td><td>다시 로그인하지 않고 쓰기 위함. 이용자 기기에만 저장되며 서버에는 보관하지 않음</td><td>30일 또는 로그아웃할 때까지</td></tr>
 </table>
 <p>아이디 회원 가입에는 이메일·전화번호 등 다른 연락처를 받지 않습니다. 편집기는 Google 계정에서 <b>이메일, 이름, 계정 고유 번호</b>만 받습니다. 비밀번호, 연락처, 드라이브 등 다른 정보에는 접근하지 않습니다.</p>
@@ -124,7 +125,7 @@ export function privacyPage() {
 <p>만 14세 미만 이용자는 보호자의 동의를 받아 이용해야 합니다.</p>
 
 <h2>7. 문의</h2>
-<p>개인정보와 관련된 문의는 <a href="${REPO}/issues">GitHub 저장소의 문의(Issues)</a>로 남겨 주세요.</p>
+<p>개인정보와 관련된 문의는 <a href="${WEB}#contact">웹판의 문의 양식</a>이나 <a href="${REPO}/issues">GitHub 저장소의 문의(Issues)</a>로 남겨 주세요.</p>
 
 <h2>8. 바뀌는 경우</h2>
 <p>이 방침이 바뀌면 이 페이지에 시행일과 함께 알립니다.</p>`);
